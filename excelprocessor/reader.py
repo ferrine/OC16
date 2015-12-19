@@ -63,6 +63,26 @@ def split_by(table, _output, clean, axes=False, named=False, *, debug=False):
 
 
 def splitter(*args, **kwargs):
+    """
+    Функция позволяет разбить сырую таблицу pandas,
+    которая содержит дочерние таблицы, на несколько,
+    и поместить их матрицы в словарь. Далее, матрицы
+    можно использовать по своему усмотрению.
+    Возможна поддержка тегов. Для этого надо
+    именовать таблицу слева сверху любой меткой,
+    она будет ключем в словаре, нумерация иначе.
+    Чтобы использовать эту функцию надо поставить
+    named=True, по умолчанию False.
+
+    :param args: table pandas.DataFrame
+    :param kwargs: named, debug
+    :return:
+    """
+    """
+    :param args:
+    :param kwargs:
+    :return:
+    """
     result = dict()
     kwargs["_output"] = result
     kwargs["clean"] = [False, False]
