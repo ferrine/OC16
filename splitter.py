@@ -6,7 +6,7 @@ import pandas as pd
 def init_stream(aStream, addition):
     if aStream == "std":
         if addition:
-            print("Unsupported usage, see -help for more info\n(stream not changed, std by default)")
+            print("Unsuppurted usage, see -help for more info\n(stream not changed, std by default)")
             sys.exit(1)
         return writer.My_std_stream()
     elif addition:
