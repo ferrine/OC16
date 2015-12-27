@@ -62,7 +62,7 @@ def split_by(table, _output, clean, axes=False, named=False, *, logfile=None):
         for item in parse_list:
             if logfile:
                 logfile.write("Clean for item is: " + str(clean) + "\n" + str(item) +"\n")
-                split_by(item, _output=_output, axes=(not axes), named=named, clean=clean, logfile=logfile)
+            split_by(item, _output=_output, axes=(not axes), named=named, clean=clean, logfile=logfile)
 
 
 
@@ -80,6 +80,8 @@ def splitter(table, named=False, *, debug=False):
     """
     if debug:
         log = open("log.txt", "w")
+    else:
+        log = None
     result = dict()
     split_by(_output=result, table=table, logfile=log, clean=[False, False], named=named)
     if debug:
