@@ -1,10 +1,11 @@
 from auditory import *
 import os
 from collections import OrderedDict as oDict
+from excelprocessor.reader import splitter
 
 if __name__ == "__main__":
     # Обновить debug.txt
-    debugfile = AuditoryException.lg
+    debugfile = RassadkaException.lg
     if os.path.isfile(debugfile):
         os.remove(debugfile)
         print(debugfile + " updated")
