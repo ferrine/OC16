@@ -65,30 +65,19 @@ class Auditory(SafeClass):
         end = {True: "Success", False: "Fail"}[result]
         print("{0: >35} for {1: >10} : {2}".format(test_name, self.outer_name, end))
 
-    def get_clean_settings(self, raw):
-        # Возможно покажется излишним код вызова исключений не интегрированный в сами проверки, но
-        # в дальнейшем я предполагаю использование суперкласса где-нибудь еще и уж точно у меня
-        # будет другой набор исключений, поэтому я решил сделать именно вот так.
-
-        # Сначала проверяем целостность ввода
-        if not self._check_settings(fact=set(raw.keys()),
-                                    req=self._required_general_options):
-            raise NotEnoughSettings(fact=set(raw.keys()),
-                                    req=self._required_general_options,
-                                    name="Проверка основных тегов на листе",
-                                    aud=self.outer_name)
+    def _init_settings(self, matrix):
         # Проверяем наличие ошибок неправильного заполнения таблицы свойств
-        if not self._check_shape(fact=raw["settings"].shape,
+        if not self._check_shape(fact=matrix.shape,
                                  req=self._required_settings_shape):
-            raise WrongShapeException(fact=raw["settings"].shape,
+            raise WrongShapeException(fact=matrix.shape,
                                       req=self._required_settings_shape,
                                       name="Проверка размерности таблицы с настройками аудитории",
                                       aud=self.outer_name)
-        if not self._check_nans(fact=raw["settings"]):
+        if not self._check_nans(fact=matrix):
             raise NansInMatrixException(name="Проверка наличия отсутствующих значений в настройках аудитории",
                                         aud=self.outer_name)
         # Чтобы проверить саму табличку надо проделать несколько махинаций, ведь по умолчанию все в виде матриц
-        settings = pd.DataFrame(raw["settings"][1:], columns=raw["settings"][0])
+        settings = pd.DataFrame(matrix[1:], columns=matrix[0])
         settings.columns = self._standard_settings_column_names
         settings.set_index("key", inplace=True)
         # Проверяем все ли настнойки внесены в табличку
@@ -106,10 +95,11 @@ class Auditory(SafeClass):
                                            req=self._required_settings_values_condition,
                                            name="Проверка валидности ввода настроек в таблицу",
                                            aud=self.outer_name)
+        self._settings = settings["code"].to_dict()
+        self._settings_table = settings
 
-        # Если с основной табличкой все впорядке, переходим к матрице близости для одного класса
-        # Тут махинаций делать не придется, нужна матрица
-        klass_condition = raw["klass"]
+    def _init_klass(self, matrix):
+        klass_condition = matrix
         if not self._check_shape(fact=klass_condition.shape,
                                  req=self._required_klass_shape):
             raise WrongShapeException(fact=klass_condition.shape,
@@ -141,16 +131,18 @@ class Auditory(SafeClass):
                                            req=self._required_klass_values_condition,
                                            name="Проверка, что в матрице близости для класса ровно один 'Участник'",
                                            aud=self.outer_name)
-        # Делаем все то же самое для матрицы близости школы
-        school_condition = raw["school"]
+        self._klass_condition_matrix = klass_condition
+
+    def _init_school(self, matrix):
+        school_condition = matrix
         if not self._check_shape(fact=school_condition.shape,
                                  req=self._required_school_shape):
             raise WrongShapeException(fact=school_condition.shape,
                                       req=self._required_school_shape,
-                                      name="Проверка размерности матрицы близости для класса",
+                                      name="Проверка размерности матрицы близости для школы",
                                       aud=self.outer_name)
         self._check_nans(fact=school_condition)
-        key, frequency = np.unique(klass_condition.flatten(), return_counts=True)
+        key, frequency = np.unique(school_condition.flatten(), return_counts=True)
         # Значения заполненных ячеек
         if not self._check_settings(fact=set(key),
                                     req=self._required_klass_values,
@@ -163,40 +155,44 @@ class Auditory(SafeClass):
         school_freq_dict = dict(zip(key, frequency))
         # Участник ровно один
         if not self._check_values_condition(fact=school_freq_dict,
-                                            req=self._required_klass_values_condition):
+                                            req=self._required_school_values_condition):
             raise ValuesConditionException(fact=school_freq_dict,
-                                           req=self._required_klass_values_condition,
+                                           req=self._required_school_values_condition,
                                            name="Проверка, что в матрице близости для школы ровно один 'Участник'",
                                            aud=self.outer_name)
+        self._school_condition_matrix = school_condition
+
+    def _init_seats(self, matrix):
         # Карта рассадки
-        seats_map = raw["seats"]
+        seats_map = matrix
         # Для нее отлько NaN и значения
         if not self._check_nans(fact=seats_map):      # В данном случае пофиг на размерность
             raise NansInMatrixException(name="Проверка наличия отсутствующих значений в карте рассадки",
                                         aud=self.outer_name)
         # Надо убедиться, что нигде не допущено опечаток
-        key, frequency = np.unique(klass_condition.flatten(), return_counts=True)
+        key, frequency = np.unique(seats_map.flatten(), return_counts=True)
         if not self._check_settings(fact=set(key),
-                                    req=self._required_klass_values,
+                                    req=self._required_seats_values,
                                     way="<="):      # Это может оказаться просто пустой лист, на который можно забить
             raise NotEnoughSettings(fact=set(key),
-                                    req=self._required_klass_values,
+                                    req=self._required_seats_values,
                                     way="<=",
                                     aud=self.outer_name)
-        return dict([("settings", settings),
-                     ("klass_condition", klass_condition),
-                     ("school_condition", school_condition),
-                     ("seats_map", seats_map)])
+        self._seats_map = seats_map
 
     def __init__(self, raw_settings, outer_name):
         self.outer_name = outer_name
         try:
-            settings_dict = self.get_clean_settings(raw_settings)
-            self._settings_table = settings_dict["settings"]
-            self._settings = settings_dict["settings"]["code"].to_dict()
-            self._klass_condition_matrix = settings_dict["klass_condition"]
-            self._school_condition_matrix = settings_dict["school_condition"]
-            self._seats_map = settings_dict["seats_map"]
+            if not self._check_settings(fact=set(raw_settings.keys()),
+                                        req=self._required_general_options):
+                raise NotEnoughSettings(fact=set(raw_settings.keys()),
+                                        req=self._required_general_options,
+                                        name="Проверка основных тегов на листе",
+                                        aud=self.outer_name)
+            self._init_settings(raw_settings["settings"])
+            self._init_klass(raw_settings["klass"])
+            self._init_school(raw_settings["school"])
+            self._init_seats(raw_settings["seats"])
         except RassadkaException as e:
             print(e)
             e.logerror()
