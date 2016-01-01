@@ -1,8 +1,123 @@
 import numpy as np
 import pandas as pd
 from safe_class import SafeClass, Ch
-
+from check_system import Checker
 from rassadka_exceptions import *
+
+
+class Seat:
+    counter = 0
+    total = 0
+
+    def __init__(self, yx, status, data=None):
+        self.yx = yx
+        self.status = bool(status)
+        self.data = data
+        if status:
+            self._plus_total()
+
+    def see_total(self):
+        return self.total
+
+    def see_seated(self):
+        return self.counter
+
+    @classmethod
+    def _plus_total(cls):
+        cls.total += 1
+
+    @classmethod
+    def _plus(cls):
+        cls.counter += 1
+
+    @classmethod
+    def _minus(cls):
+        cls.counter -= 1
+
+    def insert(self, person):
+        if not self.status:
+            raise BadSeat("Место не задействовано!")
+        if self.data is not None:
+            raise BadSeat("Место не пусто!")
+        self.data = person
+        self._plus()
+
+    def remove(self):
+        if not self.status:
+            raise BadSeat("Место не задействовано!")
+        if self.data is None:
+            raise BadSeat("Место уже пусто!")
+        self.data = None
+        self._minus()
+
+    def __bool__(self):             # Можно ли сюда сажать?
+        return self.status and self.data is None
+
+    def __str__(self):
+        return "Ряд {0}; Место {1}".format(*self.yx)
+
+    def __repr__(self):
+        res = " "*len(str(self.yx))
+        if self.status:
+            res = str(self.yx)
+        return res
+
+
+class Mapping:
+    counter = 0
+    capacity = 0
+
+    def __getattr__(self, item):
+        return getattr(self.m, item)
+
+    def __init__(self, boolmatrix):
+        res = np.zeros(boolmatrix.shape, dtype=object)
+        rows = np.apply_along_axis(lambda row: np.any(row), 1, boolmatrix).cumsum()
+        seats = boolmatrix.cumsum(1)     #Получаем места в ряду реальные, накопленные слева направо
+        for y in range(boolmatrix.shape[0]):
+            for x in range(boolmatrix.shape[1]):
+                res[y, x] = Seat((int(rows[y]), int(seats[y, x])), boolmatrix[y, x])
+                self.capacity += boolmatrix[y, x]
+        self.m = res
+        self.rows = rows
+        self.seats = seats
+
+    def _plus(self):
+        self.counter += 1
+
+    def _minus(self):
+        self.counter -= 1
+
+    def __str__(self):
+        res = """
+cumulative:
+{0}
+rows:
+{1}
+final:
+{2}
+""".format(str(self.seats), str(self.rows), str(self.m))
+        return res
+
+    def insert(self, yx, data):
+        self.m[yx].insert(data)
+        self._plus()
+
+    def remove(self, yx):
+        self.m[yx].remove()
+        self._minus()
+
+    def get_data(self, yx):
+        try:
+            return self.m[yx].data
+        except IndexError:
+            return None
+
+    def __getitem__(self, item):
+        try:
+            return self.m[item]
+        except IndexError:
+            return None
 
 
 class Auditory(SafeClass):
@@ -27,22 +142,27 @@ class Auditory(SafeClass):
     Имеется ввиду поддержка двойной нумерации, абсолютной для метода проверки
     и относительной для вывода на печать рассадки
     """
+
     _required_general_options = {"settings", "seats", "klass", "school"}
 
     _required_settings_options = {"name", "available", "class_8", "class_9",
                                   "class_10", "class_11", "individual", "command"}
 
-    _required_klass_values = {'Далеко', 'Рядом', 'Участник'}
+    _required_klass_values = {"far": 'Далеко', "close": 'Рядом', "target": 'Участник'}
 
-    _required_school_values = {'Далеко', 'Рядом', 'Участник'}
+    _required_school_values = {"far": 'Далеко', "close": 'Рядом', "target": 'Участник'}
 
-    _required_seats_values = {'Место', 'Проход'}
+    _required_seats_values = {"seat": 'Место', "not_allowed": 'Проход'}
 
     _standard_settings_column_names = ["key", "description", "code", "result"]
 
-    _required_klass_values_condition = {"Далеко": None, "Рядом": None, "Участник": Ch(lambda x: x == 1, "== 1")}
+    _required_klass_values_condition = {_required_klass_values["far"]: Ch(None, None),
+                                        _required_klass_values["close"]: Ch(None, None),
+                                        _required_klass_values["target"]: Ch(lambda x: x == 1, "== 1")}
 
-    _required_school_values_condition = {"Далеко": None, "Рядом": None, "Участник": Ch(lambda x: x == 1, "== 1")}
+    _required_school_values_condition = {_required_school_values["far"]: Ch(None, None),
+                                         _required_school_values["close"]: Ch(None, None),
+                                         _required_school_values["target"]: Ch(lambda x: x == 1, "== 1")}
 
     _required_settings_values_condition = {"name": Ch(None, None),
                                            "available": Ch(lambda x: x in {1, 0}, "in {0, 1}"),
@@ -60,6 +180,28 @@ class Auditory(SafeClass):
     _required_seats_shape = None
 
     _required_settings_shape = (9, 4)
+
+    # не реализовано
+    def _create_paths(self, matrix):
+        """
+        На вход булевская карта рассадки,
+        на выходе карта в соответствие с
+        общепринятыми правилам по созданию
+        проходов
+        [ДОДЕЛАТЬ}
+        :param matrix:
+        :return:
+        """
+        return matrix
+
+    @staticmethod
+    def _get_matrix_condition_places(matrix):
+        center = np.where(matrix == "target")
+        close = np.where(matrix == "close")
+        y = close[0] - center[0]      # смещение по у
+        x = close[1] - center[1]      # смещение по х
+        close = set(zip(y, x))
+        return close
 
     def _debug_message(self, test_name, result):
         end = {True: "Success", False: "Fail"}[result]
@@ -98,7 +240,7 @@ class Auditory(SafeClass):
         self._settings = settings["code"].to_dict()
         self._settings_table = settings
 
-    def _init_klass(self, matrix):
+    def _read_klass(self, matrix):
         klass_condition = matrix
         if not self._check_shape(fact=klass_condition.shape,
                                  req=self._required_klass_shape):
@@ -115,10 +257,10 @@ class Auditory(SafeClass):
         key, frequency = np.unique(klass_condition.flatten(), return_counts=True)
         # Проверяем есть ли там ожидаемые значения
         if not self._check_settings(fact=set(key),
-                                    req=self._required_klass_values,
+                                    req=set(self._required_klass_values.values()),
                                     way="<="):
             raise NotEnoughSettings(fact=set(key),
-                                    req=self._required_klass_values,
+                                    req=set(self._required_klass_values.values()),
                                     name="Проверка на допустимые значения в матрице близости для класса\n\
 Если там нет ни одного 'Близко', это будет считаться ошибкой",
                                     way="<=",
@@ -131,9 +273,13 @@ class Auditory(SafeClass):
                                            req=self._required_klass_values_condition,
                                            name="Проверка, что в матрице близости для класса ровно один 'Участник'",
                                            aud=self.outer_name)
-        self._klass_condition_matrix = klass_condition
+        klass_condition[klass_condition == self._required_klass_values["far"]] = "far"
+        klass_condition[klass_condition == self._required_klass_values["close"]] = "close"
+        klass_condition[klass_condition == self._required_klass_values["target"]] = "target"
+        klass_yx = self._get_matrix_condition_places(klass_condition)
+        return klass_yx
 
-    def _init_school(self, matrix):
+    def _read_school(self, matrix):
         school_condition = matrix
         if not self._check_shape(fact=school_condition.shape,
                                  req=self._required_school_shape):
@@ -145,10 +291,10 @@ class Auditory(SafeClass):
         key, frequency = np.unique(school_condition.flatten(), return_counts=True)
         # Значения заполненных ячеек
         if not self._check_settings(fact=set(key),
-                                    req=self._required_klass_values,
+                                    req=set(self._required_school_values.values()),
                                     way="<="):
             raise NotEnoughSettings(fact=set(key),
-                                    req=self._required_klass_values,
+                                    req=set(self._required_school_values.values()),
                                     name="Проверка значений в матрице",
                                     way="<=",
                                     aud=self.outer_name)
@@ -160,7 +306,11 @@ class Auditory(SafeClass):
                                            req=self._required_school_values_condition,
                                            name="Проверка, что в матрице близости для школы ровно один 'Участник'",
                                            aud=self.outer_name)
-        self._school_condition_matrix = school_condition
+        school_condition[school_condition == self._required_school_values["far"]] = "far"
+        school_condition[school_condition == self._required_school_values["close"]] = "close"
+        school_condition[school_condition == self._required_school_values["target"]] = "target"
+        school_yx = self._get_matrix_condition_places(school_condition)
+        return school_yx
 
     def _init_seats(self, matrix):
         # Карта рассадки
@@ -172,13 +322,37 @@ class Auditory(SafeClass):
         # Надо убедиться, что нигде не допущено опечаток
         key, frequency = np.unique(seats_map.flatten(), return_counts=True)
         if not self._check_settings(fact=set(key),
-                                    req=self._required_seats_values,
+                                    req=set(self._required_seats_values.values()),
                                     way="<="):      # Это может оказаться просто пустой лист, на который можно забить
             raise NotEnoughSettings(fact=set(key),
                                     req=self._required_seats_values,
                                     way="<=",
                                     aud=self.outer_name)
-        self._seats_map = seats_map
+        seats_map[seats_map == self._required_seats_values["seat"]] = True
+        seats_map[seats_map == self._required_seats_values["not_allowed"]] = False
+        cleaned_map = self._create_paths(seats_map)
+        self._seats_map = Mapping(cleaned_map)
+
+    @staticmethod
+    def _eval_map_conditions(school, klass):
+        """
+        Преобразовывает входные диапазоны в вид,
+        подготовленный для единообразной проверки
+        :param school: set
+        :param klass: set
+        :return: dict {dyx: (check klass?, check school?)}
+        """
+        kl_and_sc = school & klass
+        sc_only = school - kl_and_sc
+        kl_only = klass - kl_and_sc
+        res = dict()
+        for dyx in kl_and_sc:
+            res[dyx] = (True, True)
+        for dyx in sc_only:
+            res[dyx] = (False, True)
+        for dyx in kl_only:
+            res[dyx] = (True, False)
+        return res
 
     def __init__(self, raw_settings, outer_name):
         self.outer_name = outer_name
@@ -190,9 +364,12 @@ class Auditory(SafeClass):
                                         name="Проверка основных тегов на листе",
                                         aud=self.outer_name)
             self._init_settings(raw_settings["settings"])
-            self._init_klass(raw_settings["klass"])
-            self._init_school(raw_settings["school"])
+            klass_yx = self._read_klass(raw_settings["klass"])
+            school_yx = self._read_school(raw_settings["school"])
             self._init_seats(raw_settings["seats"])
+            self.kl_sc_dyx = self._eval_map_conditions(school=school_yx, klass=klass_yx)
+            self.checker = Checker()
+
         except RassadkaException as e:
             print(e)
             e.logerror()
@@ -204,15 +381,27 @@ class Auditory(SafeClass):
 
             seats_shape: {1}
 
-            klass_condition_matrix:
+           klass_and_school
 {2}
-
-            school_condition_matrix:
+------------Checker:------------
 {3}
 """.format(self._settings, self._seats_map.shape,
-           self._klass_condition_matrix,
-           self._school_condition_matrix)
+           self.kl_sc_dyx,
+           self.checker)
         return res
+
+    def scan(self, yx, person):
+        for dyx, todo in self.kl_sc_dyx.items():
+            coord = (yx[0] + dyx[0], yx[1] + dyx[1])
+            if not self.checker.compare(one=person,
+                                        two=self._seats_map.get_data(coord),
+                                        task=todo):
+                raise CheckIsFalse
+        return True
+
+    def __getattr__(self, item):
+        return getattr(self._seats_map, item)
+
 
 if __name__ == "__main__":
     pass

@@ -2,6 +2,7 @@ from auditory import *
 import os
 from collections import OrderedDict as oDict
 from excelprocessor.reader import splitter
+from check_system import Checker
 
 if __name__ == "__main__":
     # Обновить debug.txt
@@ -25,8 +26,13 @@ if __name__ == "__main__":
         bad_settings = pd.read_excel(path, header=None, sheetname="П1")
         bad_set = splitter(bad_settings, True)
         bad = Auditory(bad_set, stress)
-
+    print("\nТест с аудиториями закончился\n")
+    good_settings = pd.read_excel(goodpath, header=None, sheetname="Общие настройки")
+    good_set = splitter(good_settings, True)
+    Checker.pre_init(good_set)
     good_settings = pd.read_excel(goodpath, header=None, sheetname="П1")
     good_set = splitter(good_settings, True)
     a = Auditory(good_set, "П1")
     print(a)
+    print(a._seats_map, file=open("out.txt", "w"))
+    print("\n{0}".format(a._seats_map.capacity))

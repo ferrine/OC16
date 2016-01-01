@@ -1,6 +1,14 @@
 import datetime
 
 
+class CheckIsFalse(Exception):
+    pass
+
+
+class BadSeat(Exception):
+    pass
+
+
 class RassadkaException(Exception):
     lg = "debug.txt"
     situation = "Основное исключение"
@@ -17,7 +25,7 @@ class RassadkaException(Exception):
 Дата: {date}
 
     Возникло при тесте: {where}
-        B аудитории {aud}
+        На листе {aud}
 
 """.format(date=datetime.datetime.now().strftime("%A, %d. %B %Y %I:%M%p"),
            sit=self.situation,
