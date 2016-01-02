@@ -9,6 +9,10 @@ class BadSeat(Exception):
     pass
 
 
+class EndLoopException(Exception):
+    pass
+
+
 class RassadkaException(Exception):
     lg = "debug.txt"
     situation = "Основное исключение"

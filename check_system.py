@@ -1,13 +1,17 @@
 from safe_class import SafeClass, Ch
 from rassadka_exceptions import *
 import pandas as pd
-from itertools import product, permutations
+from itertools import permutations
 
 
 class Checker(SafeClass):
+    def __setattr__(self, key, value):
+        raise PermissionError("Sorry")
+
     outer_name = "Основные настройки"
+    settings = dict()
+    allowed = set()
     _pre_inited = False
-    _settings = None
     _settings_table = None
 
     _required_general_options = {"main_settings"}
@@ -41,14 +45,11 @@ class Checker(SafeClass):
 
     @classmethod
     def _eval_klass_conditions(cls):
-        all_klasses = set(product([8, 9, 10, 11], repeat=2))
         allowed = set()
         for name, item in cls.kl_comb_names.items():
-            if cls._settings[name]:
-                allowed |= set(permutations(item))
-        restricted = all_klasses - allowed
-        cls.restricted_klasses = restricted
-
+            if cls.settings[name]:
+                allowed.update(permutations(item))
+        cls.allowed = allowed
 
     @classmethod
     def _init_settings(cls, matrix):
@@ -81,11 +82,11 @@ class Checker(SafeClass):
                                            req=cls._required_settings_values_condition,
                                            name="Проверка валидности ввода настроек в таблицу с общими настройками",
                                            aud=cls.outer_name)
-        cls._settings = settings["code"].to_dict()
-        cls._settings_table = settings
-
+        cls.settings = settings["code"].to_dict()
+        cls.settings_table = settings
+    
     @classmethod
-    def pre_init(cls, raw_settings):
+    def global_init(cls, raw_settings):
         try:
             if not cls._check_settings(fact=set(raw_settings.keys()),
                                        req=cls._required_general_options):
@@ -100,17 +101,15 @@ class Checker(SafeClass):
             e.logerror()
         cls._pre_inited = True
 
-    def __init__(self):
-        assert self._pre_inited is True, "Настройки не инициализированы"
-
     def __str__(self):
         res = """
             main_settings:
 {0}
-""".format(self._settings)
+""".format(self.settings)
         return res
-
-    def compare(self, one, two, task):
+    
+    @classmethod
+    def compare(cls, one, two, task):
         """
         Проверка двух экзембляров
         :param one:
@@ -124,9 +123,12 @@ class Checker(SafeClass):
         res = True
         # Проверяем, могут ли классы сидеть вместе
         if task[0]:         # первая позиция отвечает за класс
-            res &= (one["klass"], two["klass"]) not in self.restricted_klasses
-        if task[1]:         # вторая позиция за школу
-            res &= not one["school"] == two["school"]
-        # тут мог бы быть код про города
-        #
+            res &= (one["klass"], two["klass"]) in cls.allowed
+        if not cls.settings["one_school"]:
+            if task[1]:         # вторая позиция за школу
+                res &= one["school"] != two["school"]
+        if not cls.settings["one_town"]:
+            if task[2]:
+                if one["town"] != "Москва":
+                    res &= one["town"] != two["town"]
         return res

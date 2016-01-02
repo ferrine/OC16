@@ -25,14 +25,17 @@ if __name__ == "__main__":
     for stress, path in bad_conditions.items():
         bad_settings = pd.read_excel(path, header=None, sheetname="П1")
         bad_set = splitter(bad_settings, True)
-        bad = Auditory(bad_set, stress)
+        try:
+            bad = Auditory(bad_set, stress)
+        except RassadkaException:
+            print("caught {0}".format(stress))
     print("\nТест с аудиториями закончился\n")
     good_settings = pd.read_excel(goodpath, header=None, sheetname="Общие настройки")
     good_set = splitter(good_settings, True)
-    Checker.pre_init(good_set)
+    Checker.global_init(good_set)
     good_settings = pd.read_excel(goodpath, header=None, sheetname="П1")
     good_set = splitter(good_settings, True)
     a = Auditory(good_set, "П1")
     print(a)
-    print(a._seats_map, file=open("out.txt", "w"))
-    print("\n{0}".format(a._seats_map.capacity))
+    print(a.m, file=open("out.txt", "w"))
+    print("\n{0}".format(a.capacity))
