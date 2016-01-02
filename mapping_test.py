@@ -7,6 +7,8 @@ from rassadka_exceptions import CheckIsFalse
 
 
 goodpath = "exceltestdata/auditories.xlsx"
+
+
 def clr(x):
     try:
         return x.strip()

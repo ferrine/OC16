@@ -3,13 +3,15 @@ import pandas as pd
 from safe_class import SafeClass, Ch
 from check_system import Checker
 from rassadka_exceptions import *
+import random
 
 
 class Seat:
     counter = 0
     total = 0
 
-    def __init__(self, yx, status, data=None):
+    def __init__(self, yx, status, data=None, audname=None):
+        self.aud = audname
         self.yx = yx
         self.status = bool(status)
         self.data = data
@@ -57,55 +59,53 @@ class Seat:
         return "Ряд {0}; Место {1}".format(*self.yx)
 
     def __repr__(self):
-        res = " "*len(str(self.yx))
-        if self.status:
-            res = str(self.yx)
+        res = ";"
+        if self.data:
+            res = str(self.data["klass"]) + ";"
         return res
 
 
 class Mapping:
     counter = 0
-    capacity = 0
 
     def __getattr__(self, item):
         return getattr(self.m, item)
 
-    def __init__(self, boolmatrix):
+    def __init__(self, boolmatrix, inner_name):
+        self.inner_name = inner_name
         res = np.zeros(boolmatrix.shape, dtype=object)
         rows = np.apply_along_axis(lambda row: np.any(row), 1, boolmatrix).cumsum()
-        seats = boolmatrix.cumsum(1)     #Получаем места в ряду реальные, накопленные слева направо
+        seats = boolmatrix.cumsum(1)     # Получаем места в ряду реальные, накопленные слева направо
+        self.available_seats = set()
+        self.capacity = 0
         for y in range(boolmatrix.shape[0]):
             for x in range(boolmatrix.shape[1]):
-                res[y, x] = Seat((int(rows[y]), int(seats[y, x])), boolmatrix[y, x])
-                self.capacity += boolmatrix[y, x]
+                res[y, x] = Seat(yx=(int(rows[y]), int(seats[y, x])),
+                                 status=boolmatrix[y, x],
+                                 audname=self.inner_name)
+                if boolmatrix[y, x]:
+                    self.available_seats.add((y, x))
+                    self.capacity += 1
         self.m = res
-        self.rows = rows
-        self.seats = seats
 
-    def _plus(self):
+    def _plus(self, yx):
         self.counter += 1
+        self.available_seats.remove(yx)
 
-    def _minus(self):
+    def _minus(self, yx):
         self.counter -= 1
+        self.available_seats.add(yx)
 
     def __str__(self):
-        res = """
-cumulative:
-{0}
-rows:
-{1}
-final:
-{2}
-""".format(str(self.seats), str(self.rows), str(self.m))
-        return res
+        return str(self.m)
 
     def insert(self, yx, data):
         self.m[yx].insert(data)
-        self._plus()
+        self._plus(yx)
 
     def remove(self, yx):
         self.m[yx].remove()
-        self._minus()
+        self._minus(yx)
 
     def get_data(self, yx):
         try:
@@ -331,27 +331,29 @@ class Auditory(SafeClass):
         seats_map[seats_map == self._required_seats_values["seat"]] = True
         seats_map[seats_map == self._required_seats_values["not_allowed"]] = False
         cleaned_map = self._create_paths(seats_map)
-        self._seats_map = Mapping(cleaned_map)
+        self._seats_map = Mapping(cleaned_map, str(self._settings["name"]))
 
     @staticmethod
     def _eval_map_conditions(school, klass):
         """
         Преобразовывает входные диапазоны в вид,
         подготовленный для единообразной проверки
+        *пока что буду считать, что там,
+        где проверяется школа, должен проверяться и город
         :param school: set
         :param klass: set
         :return: dict {dyx: (check klass?, check school?)}
         """
-        kl_and_sc = school & klass
-        sc_only = school - kl_and_sc
-        kl_only = klass - kl_and_sc
+        klass_school_town = school & klass
+        sc_only = school - klass_school_town
+        kl_only = klass - klass_school_town
         res = dict()
-        for dyx in kl_and_sc:
-            res[dyx] = (True, True)
+        for dyx in klass_school_town:
+            res[dyx] = (True, True, True)
         for dyx in sc_only:
-            res[dyx] = (False, True)
+            res[dyx] = (False, True, True)
         for dyx in kl_only:
-            res[dyx] = (True, False)
+            res[dyx] = (True, False, False)
         return res
 
     def __init__(self, raw_settings, outer_name):
@@ -367,12 +369,11 @@ class Auditory(SafeClass):
             klass_yx = self._read_klass(raw_settings["klass"])
             school_yx = self._read_school(raw_settings["school"])
             self._init_seats(raw_settings["seats"])
-            self.kl_sc_dyx = self._eval_map_conditions(school=school_yx, klass=klass_yx)
+            self.klass_school_town_dyx = self._eval_map_conditions(school=school_yx, klass=klass_yx)
             self.checker = Checker()
-
         except RassadkaException as e:
-            print(e)
             e.logerror()
+            raise e
 
     def __str__(self):
         res = """
@@ -381,27 +382,55 @@ class Auditory(SafeClass):
 
             seats_shape: {1}
 
-           klass_and_school
+           klass_school_town
 {2}
 ------------Checker:------------
 {3}
 """.format(self._settings, self._seats_map.shape,
-           self.kl_sc_dyx,
+           self.klass_school_town_dyx,
            self.checker)
         return res
 
     def scan(self, yx, person):
-        for dyx, todo in self.kl_sc_dyx.items():
+        for dyx, todo in self.klass_school_town_dyx.items():
             coord = (yx[0] + dyx[0], yx[1] + dyx[1])
             if not self.checker.compare(one=person,
                                         two=self._seats_map.get_data(coord),
                                         task=todo):
-                raise CheckIsFalse
+                return False
         return True
 
     def __getattr__(self, item):
         return getattr(self._seats_map, item)
 
+    def _rand_loop_insert(self, data, available):
+        if not available:
+            raise EndLoopException
+        for_check = random.sample(available, 1)[0]
+        available.remove(for_check)
+        if self.scan(for_check, data):
+            self.insert(for_check, data)
+            return for_check
+        else:
+            self._rand_loop_insert(data, available)
+
+    def rand_insert(self, data):
+        not_visited = self.available_seats.copy()
+        return self._rand_loop_insert(data=data, available=not_visited)
+
+    def team_rand_insert(self, team):
+        if self.checker.settings["max_compart"] < (self.counter + len(team)) / self.capacity:
+            return False
+        inserted = set()
+        try:
+            for member in team:
+                inserted.add(self.rand_insert(member))
+        except EndLoopException:
+            for ups in inserted:
+                self.remove(ups)
+            return False
+        else:
+            return True
 
 if __name__ == "__main__":
     pass
