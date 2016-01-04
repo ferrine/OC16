@@ -13,6 +13,10 @@ class EndLoopException(Exception):
     pass
 
 
+class NoFreeAuditory(Exception):
+    pass
+
+
 class RassadkaException(Exception):
     lg = "debug.txt"
     situation = "Основное исключение"

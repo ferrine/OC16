@@ -21,8 +21,9 @@ class Seat:
     def see_total(self):
         return self.total
 
-    def see_seated(self):
-        return self.counter
+    @classmethod
+    def count_seated(cls):
+        return cls.counter
 
     @classmethod
     def _plus_total(cls):
@@ -49,11 +50,11 @@ class Seat:
             raise BadSeat("Место не задействовано!")
         if self.data is None:
             raise BadSeat("Место уже пусто!")
-        self.data = None
         self._minus()
+        self.data = None
 
-    def __bool__(self):             # Можно ли сюда сажать?
-        return self.status and self.data is None
+    def __bool__(self):             # Тут кто-то сидит?
+        return self.data is not None
 
     def __str__(self):
         return "Ряд {0}; Место {1}".format(*self.yx)
@@ -64,12 +65,16 @@ class Seat:
             res = str(self.data["klass"]) + ";"
         return res
 
+    def get_placed(self):
+        if self.data:
+            res = self.data.copy()
+            res["aud"] = self.aud
+            res["row"], res["column"] = self.yx
+            return res
+
 
 class Mapping:
     counter = 0
-
-    def __getattr__(self, item):
-        return getattr(self.m, item)
 
     def __init__(self, boolmatrix, inner_name):
         self.inner_name = inner_name
@@ -118,6 +123,24 @@ class Mapping:
             return self.m[item]
         except IndexError:
             return None
+
+    def get_all_seated(self):
+        res = list()
+        for seat in self.m[np.where(self.m)].tolist():
+            res.append(seat.get_placed())
+        return res
+
+    def count_team_members(self):
+        count = 0
+        team_num = set()
+        for seat in self.m[np.where(self.m)].tolist():
+            if seat.data["team"] != "и":
+                count += 1
+                team_num.add(seat.data["team"])
+        res = dict([("people", count),
+                    ("teams", len(team_num)),
+                    ("team_numbers", team_num)])
+        return res
 
 
 class Auditory(SafeClass):
@@ -239,6 +262,12 @@ class Auditory(SafeClass):
                                            aud=self.outer_name)
         self._settings = settings["code"].to_dict()
         self._settings_table = settings
+        self.inner_name = str(self._settings["name"])
+        restricted = set()
+        for cl in ["class_8", "class_9", "class_10", "class_11"]:
+            if not self._settings[cl]:
+                restricted.add(cl)
+        self.restricted_klasses = restricted
 
     def _read_klass(self, matrix):
         klass_condition = matrix
@@ -357,6 +386,7 @@ class Auditory(SafeClass):
         return res
 
     def __init__(self, raw_settings, outer_name):
+        self.team_handler = set()
         self.outer_name = outer_name
         try:
             if not self._check_settings(fact=set(raw_settings.keys()),
@@ -386,7 +416,7 @@ class Auditory(SafeClass):
 {2}
 ------------Checker:------------
 {3}
-""".format(self._settings, self._seats_map.shape,
+""".format(self._settings, self.shape,
            self.klass_school_town_dyx,
            self.checker)
         return res
@@ -395,7 +425,7 @@ class Auditory(SafeClass):
         for dyx, todo in self.klass_school_town_dyx.items():
             coord = (yx[0] + dyx[0], yx[1] + dyx[1])
             if not self.checker.compare(one=person,
-                                        two=self._seats_map.get_data(coord),
+                                        two=self.get_data(coord),
                                         task=todo):
                 return False
         return True
@@ -410,27 +440,84 @@ class Auditory(SafeClass):
         available.remove(for_check)
         if self.scan(for_check, data):
             self.insert(for_check, data)
-            return for_check
+            self.team_handler.add(for_check)
         else:
             self._rand_loop_insert(data, available)
 
     def rand_insert(self, data):
+        # доступна ли аудитория вообще?
+        if not self._settings["available"]:
+            raise EndLoopException
+        # Проверка, можно ли сажать данного участника
+        # Критерий "командный/индивидуальный"
+        if data["team"] == "и":
+            if not self._settings["individual"]:
+                raise EndLoopException
+        else:
+            if not self._settings["command"]:
+                raise EndLoopException
+        # Критерий по классу
+        if data["klass"] in self.restricted_klasses:
+            raise EndLoopException
         not_visited = self.available_seats.copy()
-        return self._rand_loop_insert(data=data, available=not_visited)
+        self._rand_loop_insert(data=data, available=not_visited)
 
     def team_rand_insert(self, team):
+        if not self.capacity > 0:
+            raise EndLoopException
+        # поместится ли команда?
         if self.checker.settings["max_compart"] < (self.counter + len(team)) / self.capacity:
-            return False
-        inserted = set()
+            raise EndLoopException
+        # Дальнейшик проверки для простоты находятся во вспомогательной функции
+        self.team_handler = set()
         try:
             for member in team:
-                inserted.add(self.rand_insert(member))
+                self.rand_insert(member)
         except EndLoopException:
-            for ups in inserted:
+            for ups in self.team_handler:
                 self.remove(ups)
-            return False
-        else:
-            return True
+            # Для конроллера необходимо словить исключение в этом случае
+            raise EndLoopException
+
+    def __hash__(self):
+        return hash(self.inner_name)
+
+    def __lt__(self, other):
+        return self.inner_name < other.inner_name
+
+    def __le__(self, other):
+        return self.inner_name <= other.inner_name
+
+    def __gt__(self, other):
+        return self.inner_name > other.inner_name
+
+    def __ge__(self, other):
+        return self.inner_name >= other.inner_name
+
+    def __eq__(self, other):
+        return self.inner_name == other.inner_name
+
+    def summary(self):
+        team_info = self.count_team_members()
+        av = "+" if self._settings["available"] else "-"
+        com = "+" if self._settings["command"] else "-"
+        ind = "+" if self._settings["individual"] else "-"
+        message = """
+Аудитрия [{0}] {1}
+Доступность: K[{2}], И[{3}]
+Всего мест:         {4}
+Посажено            {5}
+Из них командных    {6}
+Всего команд        {7}
+""".format(av,
+           self.inner_name,
+           com, ind,
+           self.capacity,
+           self.counter,
+           team_info["people"],
+           team_info["teams"])
+        return message
+
 
 if __name__ == "__main__":
     pass

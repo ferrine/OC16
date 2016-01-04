@@ -20,7 +20,7 @@ people.columns = ["id", "fam", "name", "otch", "town", "school", "team", "klass"
 people["klass"] = people["klass"].apply(lambda x: x.split()[0])
 good_settings = pd.read_excel(goodpath, header=None, sheetname="Общие настройки")
 good_set = splitter(good_settings, True)
-Checker.pre_init(good_set)
+Checker.global_init(good_set)
 good_settings = pd.read_excel(goodpath, header=None, sheetname="П1")
 good_set = splitter(good_settings, True)
 a = Auditory(good_set, "П1")
