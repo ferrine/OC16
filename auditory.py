@@ -4,6 +4,7 @@ from safe_class import SafeClass, Ch
 from check_system import Checker
 from rassadka_exceptions import *
 import random
+from itertools import product
 
 
 class Seat:
@@ -30,12 +31,30 @@ class Seat:
         cls.total += 1
 
     @classmethod
+    def _minus_total(cls):
+        cls.total -= 1
+
+    @classmethod
     def _plus(cls):
         cls.counter += 1
 
     @classmethod
     def _minus(cls):
         cls.counter -= 1
+
+    def switch_on(self):
+        if not self.status:
+            self.status = True
+            self._plus_total()
+        else:
+            raise PermissionError
+
+    def switch_off(self):
+        if self.status and self.data is None:
+            self.status = False
+            self._minus_total()
+        else:
+            raise PermissionError
 
     def insert(self, person):
         if not self.status:
@@ -69,12 +88,16 @@ class Seat:
         if self.data:
             res = self.data.copy()
             res["aud"] = self.aud
-            res["row"], res["column"] = self.yx
+            res["row"], res["col"] = self.yx
             return res
 
 
 class Mapping:
     counter = 0
+
+    def __getattr__(self, item):
+        where = object.__getattribute__(self, "m")
+        return getattr(where, item)
 
     def __init__(self, boolmatrix, inner_name):
         self.inner_name = inner_name
@@ -83,15 +106,26 @@ class Mapping:
         seats = boolmatrix.cumsum(1)     # Получаем места в ряду реальные, накопленные слева направо
         self.available_seats = set()
         self.capacity = 0
+        max_row = 0
+        max_col = 0
         for y in range(boolmatrix.shape[0]):
             for x in range(boolmatrix.shape[1]):
                 res[y, x] = Seat(yx=(int(rows[y]), int(seats[y, x])),
                                  status=boolmatrix[y, x],
                                  audname=self.inner_name)
                 if boolmatrix[y, x]:
-                    self.available_seats.add((y, x))
-                    self.capacity += 1
-        self.m = res
+                    self._plus_capacity((y, x))
+                    max_row = max(max_row, y)
+                    max_col = max(max_col, x)
+        self.m = res[:max_row + 1, :max_col + 1]
+
+    def _plus_capacity(self, yx):
+        self.available_seats.add(yx)
+        self.capacity += 1
+
+    def _minus_capacity(self, yx):
+        self.available_seats.remove(yx)
+        self.capacity -= 1
 
     def _plus(self, yx):
         self.counter += 1
@@ -100,6 +134,13 @@ class Mapping:
     def _minus(self, yx):
         self.counter -= 1
         self.available_seats.add(yx)
+
+    def switch_off(self, yx):
+        try:
+            self.m[yx].switch_off()
+            self._minus_capacity(yx)
+        except PermissionError:
+            pass
 
     def __str__(self):
         return str(self.m)
@@ -130,16 +171,26 @@ class Mapping:
             res.append(seat.get_placed())
         return res
 
-    def count_team_members(self):
-        count = 0
+    def clean_all(self):
+        for yx in product(range(self.m.shape[0]), range(self.m.shape[1])):
+            try:
+                self.remove(yx)
+            except BadSeat:
+                pass
+
+    def get_aud_info(self):
+        team_members = 0
         team_num = set()
+        klass_count = dict([("n8", 0), ("n9", 0), ("n10", 0), ("n11", 0)])
         for seat in self.m[np.where(self.m)].tolist():
+            klass_count["n" + str(seat.data["klass"])] += 1
             if seat.data["team"] != "и":
-                count += 1
+                team_members += 1
                 team_num.add(seat.data["team"])
-        res = dict([("people", count),
+        res = dict([("team_members", team_members),
                     ("teams", len(team_num)),
-                    ("team_numbers", team_num)])
+                    ("total", self.counter),
+                    ("capacity", self.capacity)], **klass_count)
         return res
 
 
@@ -165,6 +216,8 @@ class Auditory(SafeClass):
     Имеется ввиду поддержка двойной нумерации, абсолютной для метода проверки
     и относительной для вывода на печать рассадки
     """
+    info_order = ["old_capacity", "capacity", "total", "teams", "team_members",
+                  "n8", "n9", "n10", "n11"]
 
     _required_general_options = {"settings", "seats", "klass", "school"}
 
@@ -205,17 +258,35 @@ class Auditory(SafeClass):
     _required_settings_shape = (9, 4)
 
     # не реализовано
-    def _create_paths(self, matrix):
+    def _create_paths(self):
         """
-        На вход булевская карта рассадки,
+        На вход инициализированная карта рассадки,
         на выходе карта в соответствие с
         общепринятыми правилам по созданию
         проходов
-        [ДОДЕЛАТЬ}
-        :param matrix:
-        :return:
+        :return: None
         """
-        return matrix
+        self.old_capacity = self.capacity
+        if self.checker.settings["over_row"] != 1:
+            trigger = 1
+            for row in range(self._seats_map.shape[0]):
+                if any([seat.status for seat in self._seats_map[row, :]]):
+                    if trigger % self.checker.settings["over_row"] == 0:
+                        for seat in range(self._seats_map.shape[1]):
+                            self._seats_map.switch_off((row, seat))
+                    trigger += 1
+                else:
+                    trigger = 1
+        if self.checker.settings["over_place"] != 1:
+            trigger = 1
+            for seat in range(self._seats_map.shape[1]):
+                if any([seat.status for seat in self._seats_map[:, seat]]):
+                    if trigger % self.checker.settings["over_place"] == 0:
+                        for row in range(self._seats_map.shape[0]):
+                            self._seats_map.switch_off((row, seat))
+                    trigger += 1
+                else:
+                    trigger = 1
 
     @staticmethod
     def _get_matrix_condition_places(matrix):
@@ -359,8 +430,8 @@ class Auditory(SafeClass):
                                     aud=self.outer_name)
         seats_map[seats_map == self._required_seats_values["seat"]] = True
         seats_map[seats_map == self._required_seats_values["not_allowed"]] = False
-        cleaned_map = self._create_paths(seats_map)
-        self._seats_map = Mapping(cleaned_map, str(self._settings["name"]))
+        self._seats_map = Mapping(seats_map, str(self._settings["name"]))
+        self._create_paths()
 
     @staticmethod
     def _eval_map_conditions(school, klass):
@@ -386,6 +457,7 @@ class Auditory(SafeClass):
         return res
 
     def __init__(self, raw_settings, outer_name):
+        self.checker = Checker()
         self.team_handler = set()
         self.outer_name = outer_name
         try:
@@ -400,7 +472,6 @@ class Auditory(SafeClass):
             school_yx = self._read_school(raw_settings["school"])
             self._init_seats(raw_settings["seats"])
             self.klass_school_town_dyx = self._eval_map_conditions(school=school_yx, klass=klass_yx)
-            self.checker = Checker()
         except RassadkaException as e:
             e.logerror()
             raise e
@@ -431,7 +502,8 @@ class Auditory(SafeClass):
         return True
 
     def __getattr__(self, item):
-        return getattr(self._seats_map, item)
+        where = object.__getattribute__(self, "_seats_map")
+        return getattr(where, item)
 
     def _rand_loop_insert(self, data, available):
         if not available:
@@ -497,27 +569,67 @@ class Auditory(SafeClass):
     def __eq__(self, other):
         return self.inner_name == other.inner_name
 
+    def info(self):
+        info = self.get_aud_info()
+        info["name"] = self.inner_name
+        info["old_capacity"] = self.old_capacity
+        info["av"] = "+" if self._settings["available"] else "-"
+        info["com"] = "+" if self._settings["command"] else "-"
+        info["ind"] = "+" if self._settings["individual"] else "-"
+        info["kl8"] = "+" if self._settings["class_8"] else "-"
+        info["kl9"] = "+" if self._settings["class_9"] else "-"
+        info["kl10"] = "+" if self._settings["class_10"] else "-"
+        info["kl11"] = "+" if self._settings["class_11"] else "-"
+        return info
+
     def summary(self):
-        team_info = self.count_team_members()
-        av = "+" if self._settings["available"] else "-"
-        com = "+" if self._settings["command"] else "-"
-        ind = "+" if self._settings["individual"] else "-"
         message = """
-Аудитрия [{0}] {1}
-Доступность: K[{2}], И[{3}]
-Всего мест:         {4}
-Посажено            {5}
-Из них командных    {6}
-Всего команд        {7}
-""".format(av,
-           self.inner_name,
-           com, ind,
-           self.capacity,
-           self.counter,
-           team_info["people"],
-           team_info["teams"])
+Аудитрия [{av}] {name}
+Доступность: K[{com}], И[{ind}]
+Всего мест:         {capacity: <3}| 8  класс[{kl8}]:{n8}
+Посажено:           {total: <3}| 9  класс[{kl9}]:{n9}
+Из них командных:   {team_members: <3}| 10 класс[{kl10}]:{n10}
+Всего команд:       {teams: <3}| 11 класс[{kl11}]:{n11}
+""".format(**self.info())
         return message
 
+    def __repr__(self):
+        mes = "<{0}: cap={1}>"
+        return mes.format(self.inner_name, self.capacity)
+
+    def map_with_data_to_writer(self, writer, name_format, data):
+        dy = 1
+        dx = 0
+        writer.write(0, 0, self.inner_name, name_format)
+        writer.write(0 + dy, 0 + dx, "Абсолютные")
+        for y in range(self.shape[0]):
+            writer.write(y + 1 + dy, 0 + dx, "ряд " + str(y + 1))
+        for x in range(self.shape[1]):
+            writer.write(0 + dy, x + 1 + dx, "место " + str(x + 1))
+        for y, x in product(range(self.shape[0]), range(self.shape[1])):
+            task = self.get_data((y + dy, x + dx))
+            if task:
+                task = task[data]
+            writer.write(y + 1 + dy, x + 1 + dx, task)
+
+    def map_with_status_to_writer(self, writer, name_format):
+        dy = 1
+        dx = 0
+        writer.write(0, 0, self.inner_name, name_format)
+        writer.write(0 + dy, 0 + dx, "Абсолютные")
+        for y in range(self.shape[0]):
+            writer.write(y + 1 + dy, 0 + dx, "ряд " + str(y + 1))
+        for x in range(self.shape[1]):
+            writer.write(0 + dy, x + 1 + dx, "место " + str(x + 1))
+        for y, x in product(range(self.shape[0]), range(self.shape[1])):
+            task = "проход"
+            if self._seats_map[y, x].status:
+                task = str(self._seats_map[y, x].yx)
+            writer.write(y + 1 + dy, x + 1 + dx, task)
+
+    def people_table(self):
+        table = pd.DataFrame.from_records(self.get_all_seated())
+        return table
 
 if __name__ == "__main__":
     pass
