@@ -4,48 +4,51 @@ import numpy as np
 
 def split_by(table, _output, clean, axes=False, named=False, *, logfile=None):
     """
-
-    argument named: именовать ли таблицы? (в таком случае будет взята верхняя левая ячейка как имя)
-    argument _output: куда выводить чистые табицы
-    type table: Pandas DataFrame
-    arg clean: насколько чиста таблица? [чисто по Y, чисто по X]
-    argument axes: column?
+    Функция, используемая в рекурсивном алгоритме
+    :argument named: именовать ли таблицы? (в таком случае будет взята верхняя левая ячейка как имя)
+    :argument _output: куда выводить чистые табицы
+    :parameter axes: column?
+    :type table: pd.DataFrame
+    :type _output: dict
+    :type clean: list
+    :type named: bool
+    :type logfile: file
     """
     assert type(table) is pd.DataFrame, "К сожалению, функция работает только с pandas.DataFrame"
     if min(table.shape) <= 1:  # не обрабатываем "нетаблицы"
         if logfile:
-            logfile.write("Table has bad shape [" + str(table.shape) + "]\n" )
+            logfile.write("Table has bad shape [" + str(table.shape) + "]\n")
             logfile.write(str(table) + "\n")
         return
     parse_list = []
-    to_slise = []
-    clean[axes] = True  # Использую прием, что по индексу axes я меняю только текущую итерацию, при первом прогоне полюбому пройдет второй
-    if logfile:
-        logfile.write("Checking: " + str(range(table.shape[axes])) +"\n")
+    to_sliсe = []
+    clean[axes] = True  # Использую прием, что по индексу axes я меняю
+    if logfile:         # только текущую итерацию, при первом прогоне полюбому пройдет второй
+        logfile.write("Checking: " + str(range(table.shape[axes])) + "\n")
     for i in range(table.shape[axes]):
         if logfile:
-            logfile.write(str((table.iloc[:, i] if axes else table.iloc[i, :]).values) +"\n")
-        if not np.all(pd.isnull((table.iloc[:, i] if axes else table.iloc[i, :]))):     # если строка/столбец не пустая, то возвращает Ложь
-            to_slise.append(i)
+            logfile.write(str((table.iloc[:, i] if axes else table.iloc[i, :]).values) + "\n")
+        if not np.all(pd.isnull((table.iloc[:, i] if axes else table.iloc[i, :]))):     # если строка/столбец не пустая,
+            to_sliсe.append(i)                                                          # то возвращает Ложь
             if logfile:
                 logfile.write({0: "Row ", 1: "Col "}[axes] + str(i) +
-                      "\t is not empty and to_slise = " + str(to_slise) + "\n" +
-                      "-"*10 +"\n")
+                              "\t is not empty and to_sliсe = " + str(to_sliсe) + "\n" +
+                              "-"*10 + "\n")
         else:
             clean = [False, False]  # Если что-то не так, надо прогнать еще два раза
-            if to_slise:
+            if to_sliсe:
                 if logfile:
-                    logfile.write("Appending: " + str(to_slise) +"\n")
-                parse_list.append((table.iloc[:, to_slise] if axes else table.iloc[to_slise, :]))
-                to_slise = []
+                    logfile.write("Appending: " + str(to_sliсe) +"\n")
+                parse_list.append((table.iloc[:, to_sliсe] if axes else table.iloc[to_sliсe, :]))
+                to_sliсe = []
             if logfile:
-                logfile.write({0: "Row ", 1: "Col "}[axes] + str(i) + "\t is empty and to_slise = " + str(to_slise) + "\n" +
+                logfile.write({0: "Row ", 1: "Col "}[axes] + str(i) + "\t is empty and to_sliсe = " + str(to_sliсe) + "\n" +
                       "-"*10 +"\n")
     else:
-        if to_slise:
+        if to_sliсe:
             if logfile:
-                logfile.write("Appending: " + str(to_slise) +"\n")
-            parse_list.append((table.iloc[:, to_slise] if axes else table.iloc[to_slise, :]))
+                logfile.write("Appending: " + str(to_sliсe) +"\n")
+            parse_list.append((table.iloc[:, to_sliсe] if axes else table.iloc[to_sliсe, :]))
     if clean[0] and clean[1]:  #Проверим, отчистили ли мы эту таблицу
         move_x = int(np.all(pd.isnull(parse_list[0].iloc[1:, 0])))  # Проверяем крайние левый и верхний ряд, тк там
         move_y = int(np.all(pd.isnull(parse_list[0].iloc[0, 1:])))  # может быть имя и надо удалять пустоты
@@ -63,7 +66,6 @@ def split_by(table, _output, clean, axes=False, named=False, *, logfile=None):
             if logfile:
                 logfile.write("Clean for item is: " + str(clean) + "\n" + str(item) +"\n")
             split_by(item, _output=_output, axes=(not axes), named=named, clean=clean, logfile=logfile)
-
 
 
 def splitter(table, named=False, *, debug=False):

@@ -1,7 +1,9 @@
-from safe_class import SafeClass, Ch
-from rassadka_exceptions import *
-import pandas as pd
 from itertools import permutations
+
+import pandas as pd
+
+from rassadka_modules.rassadka_exceptions import *
+from rassadka_modules.safe_class import SafeClass, Ch
 
 
 class Checker(SafeClass):
@@ -83,10 +85,11 @@ class Checker(SafeClass):
                                            name="Проверка валидности ввода настроек в таблицу с общими настройками",
                                            aud=cls.outer_name)
         cls.settings = settings["code"].to_dict()
-        cls.settings_table = settings
     
     @classmethod
-    def global_init(cls, raw_settings):
+    def raw_global_init(cls, raw_settings):
+        if cls._pre_inited is True:
+            raise PermissionError("Уже инициализирована")
         try:
             if not cls._check_settings(fact=set(raw_settings.keys()),
                                        req=cls._required_general_options):
@@ -98,7 +101,15 @@ class Checker(SafeClass):
             cls._eval_klass_conditions()
         except RassadkaException as e:
             print(e)
-            e.logerror()
+            e.log_error()
+        cls._pre_inited = True
+
+    @classmethod
+    def clean_global_init(cls, clean_settings):
+        if cls._pre_inited is True:
+            raise PermissionError("Уже инициализирована")
+        cls.settings = clean_settings
+        cls._eval_klass_conditions()
         cls._pre_inited = True
 
     def __str__(self):
@@ -122,13 +133,13 @@ class Checker(SafeClass):
 
         res = True
         # Проверяем, могут ли классы сидеть вместе
-        if task[0]:         # первая позиция отвечает за класс
+        if task["klass"]:         # первая позиция отвечает за класс
             res &= (one["klass"], two["klass"]) in cls.allowed
         if not cls.settings["one_school"]:
-            if task[1]:         # вторая позиция за школу
+            if task["school"]:         # вторая позиция за школу
                 res &= one["school"] != two["school"]
         if not cls.settings["one_town"]:
-            if task[2]:
+            if task["town"]:
                 if one["town"] != "Москва":
                     res &= one["town"] != two["town"]
         return res

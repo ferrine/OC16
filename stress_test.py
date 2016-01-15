@@ -1,10 +1,13 @@
-from auditory import *
 import os
 from collections import OrderedDict as oDict
-from excelprocessor.reader import splitter
-from check_system import Checker
+
+from rassadka_modules.auditory import *
+
+from rassadka_modules.check_system import Checker
+from rassadka_modules.excelprocessor.reader import splitter
 
 if __name__ == "__main__":
+    prefix = "test_out\\"
     # Обновить debug.txt
     debugfile = RassadkaException.lg
     if os.path.isfile(debugfile):
@@ -32,10 +35,10 @@ if __name__ == "__main__":
     print("\nТест с аудиториями закончился\n")
     good_settings = pd.read_excel(goodpath, header=None, sheetname="Общие настройки")
     good_set = splitter(good_settings, True)
-    Checker.global_init(good_set)
+    Checker.raw_global_init(good_set)
     good_settings = pd.read_excel(goodpath, header=None, sheetname="П1")
     good_set = splitter(good_settings, True)
     a = Auditory(good_set, "П1")
     print(a)
-    print(a.m, file=open("out.txt", "w"))
+    print(a.m, file=open(prefix + "out.txt", "w"))
     print("\n{0}".format(a.capacity))

@@ -2,12 +2,12 @@ import pandas as pd
 
 
 class Ch:
-        def __init__(self, func, descr):
+        def __init__(self, func, description):
             self.func = func
-            self.descr = descr
+            self.description = description
 
         def __str__(self):
-            return str(self.descr)
+            return str(self.description)
 
         def __call__(self, *args, **kwargs):
             if self.func is not None:

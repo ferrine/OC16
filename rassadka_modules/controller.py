@@ -1,12 +1,14 @@
-from auditory import Auditory
-from check_system import Checker
-from rassadka_exceptions import *
-from pandas import ExcelFile
-from excelprocessor.reader import splitter
-import numpy as np
 import random
+
+import numpy as np
 import pandas as pd
 import xlsxwriter
+from rassadka_modules.auditory import Auditory
+from pandas import ExcelFile
+
+from rassadka_modules.check_system import Checker
+from rassadka_modules.excelprocessor.reader import splitter
+from rassadka_modules.rassadka_exceptions import *
 
 
 def clr(x):
@@ -47,7 +49,7 @@ class Controller:
                     print("В {0} две страницы с общими настройками".format(filename))
                     continue
                 found_main_settings = True
-                Checker.global_init(unresolved_dict)
+                Checker.raw_global_init(unresolved_dict)
                 self.checker = Checker()
         if not found_main_settings:
             raise TypeError("Настройки не найдены, на странице с настройками нужен ключ main_settings")

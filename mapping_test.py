@@ -1,10 +1,9 @@
-from auditory import Auditory
-import timeit
 import pandas as pd
-from check_system import Checker
-from excelprocessor.reader import splitter
-from rassadka_exceptions import CheckIsFalse
+from auditory import Auditory
 
+from rassadka_modules.check_system import Checker
+from rassadka_modules.excelprocessor import splitter
+from rassadka_modules.rassadka_exceptions import CheckIsFalse
 
 goodpath = "exceltestdata/auditories.xlsx"
 
@@ -20,7 +19,7 @@ people.columns = ["id", "fam", "name", "otch", "town", "school", "team", "klass"
 people["klass"] = people["klass"].apply(lambda x: x.split()[0])
 good_settings = pd.read_excel(goodpath, header=None, sheetname="Общие настройки")
 good_set = splitter(good_settings, True)
-Checker.global_init(good_set)
+Checker.raw_global_init(good_set)
 good_settings = pd.read_excel(goodpath, header=None, sheetname="П1")
 good_set = splitter(good_settings, True)
 a = Auditory(good_set, "П1")

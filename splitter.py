@@ -1,7 +1,10 @@
-from excelprocessor import reader, writer
-import sys
 import argparse
+import sys
+
 import pandas as pd
+
+from rassadka_modules.excelprocessor import reader, writer
+
 
 def init_stream(aStream, addition):
     if aStream == "std":

@@ -53,7 +53,7 @@ class RassadkaException(Exception):
 
 """
 
-    def logerror(self):
+    def log_error(self):
         with open(self.lg, "a") as log:
             log.write(self.header())
             log.write(self.message())

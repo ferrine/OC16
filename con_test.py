@@ -1,8 +1,12 @@
-from controller import Controller
 import pickle
-import rassadka_exceptions
+
+from rassadka_modules import rassadka_exceptions
+from rassadka_modules.controller import Controller
+
 
 if __name__ == "__main__":
+    prefix = "test_out\\"
+
     settings = "exceltestdata/settings.xlsx"
     people = "exceltestdata/people.xlsx"
     print("getting settings")
@@ -22,15 +26,15 @@ if __name__ == "__main__":
     con.dump_seated()
     print("done")
     print("printing self...")
-    print(con.whole_summary(), file=open("whole_sum.txt", "w"))
+    print(con.whole_summary(), file=open(prefix + "whole_sum.txt", "w"))
     print("dumping self...")
-    with open("dump.pkl", "wb") as d:
+    with open(prefix + "dump.pkl", "wb") as d:
         pickle.dump(con, d)
     print("loading self...")
-    n = pickle.load(open("dump.pkl", "rb"))
+    n = pickle.load(open(prefix + "dump.pkl", "rb"))
     print(n.auds)
-    n.write_maps_with_data("with_klass.xlsx", "klass")
-    n.write_maps_with_status("with_status.xlsx")
+    n.write_maps_with_data(prefix + "with_klass.xlsx", "klass")
+    n.write_maps_with_status(prefix + "with_status.xlsx")
     n.xlsx_summary()
 
 

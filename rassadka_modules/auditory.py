@@ -1,10 +1,12 @@
-import numpy as np
-import pandas as pd
-from safe_class import SafeClass, Ch
-from check_system import Checker
-from rassadka_exceptions import *
 import random
 from itertools import product
+
+import numpy as np
+import pandas as pd
+
+from rassadka_modules.check_system import Checker
+from rassadka_modules.rassadka_exceptions import *
+from rassadka_modules.safe_class import SafeClass, Ch
 
 
 class Seat:
@@ -445,15 +447,15 @@ class Auditory(SafeClass):
         :return: dict {dyx: (check klass?, check school?)}
         """
         klass_school_town = school & klass
-        sc_only = school - klass_school_town
+        sc_and_town_only = school - klass_school_town
         kl_only = klass - klass_school_town
         res = dict()
         for dyx in klass_school_town:
-            res[dyx] = (True, True, True)
-        for dyx in sc_only:
-            res[dyx] = (False, True, True)
+            res[dyx] = {"klass": True, "school": True, "town": True}
+        for dyx in sc_and_town_only:
+            res[dyx] = {"klass": False, "school": True, "town": True}
         for dyx in kl_only:
-            res[dyx] = (True, False, False)
+            res[dyx] = {"klass": True, "school": False, "town": False}
         return res
 
     def __init__(self, raw_settings, outer_name):
@@ -473,7 +475,7 @@ class Auditory(SafeClass):
             self._init_seats(raw_settings["seats"])
             self.klass_school_town_dyx = self._eval_map_conditions(school=school_yx, klass=klass_yx)
         except RassadkaException as e:
-            e.logerror()
+            e.log_error()
             raise e
 
     def __str__(self):
