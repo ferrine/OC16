@@ -10,8 +10,8 @@ from rassadka_modules.safe_class import SafeClass, Ch
 
 
 class Seat:
-    counter = 0
-    total = 0
+    counters = dict([("counter", 0),
+                     ("total", 0)])
 
     def __init__(self, yx, status, data=None, audname=None):
         self.aud = audname
@@ -22,27 +22,27 @@ class Seat:
             self._plus_total()
 
     def see_total(self):
-        return self.total
+        return self.counters["total"]
 
     @classmethod
     def count_seated(cls):
-        return cls.counter
+        return cls.counters["counter"]
 
     @classmethod
     def _plus_total(cls):
-        cls.total += 1
+        cls.counters["total"] += 1
 
     @classmethod
     def _minus_total(cls):
-        cls.total -= 1
+        cls.counters["total"] -= 1
 
     @classmethod
     def _plus(cls):
-        cls.counter += 1
+        cls.counters["counter"] += 1
 
     @classmethod
     def _minus(cls):
-        cls.counter -= 1
+        cls.counters["counter"] -= 1
 
     def switch_on(self):
         if not self.status:
@@ -93,21 +93,31 @@ class Seat:
             res["row"], res["col"] = self.yx
             return res
 
+    def __eq__(self, other):
+        """
+
+        :param other:
+        :type other: Seat
+        :return:
+        """
+        if not self.data == other.data:
+            return False
+        return True
+
 
 class Mapping:
-    counter = 0
-
     def __getattr__(self, item):
         where = object.__getattribute__(self, "m")
         return getattr(where, item)
 
     def __init__(self, boolmatrix, inner_name):
+        self.counter = 0
         self.inner_name = inner_name
+        self.available_seats = set()
+        self.capacity = 0
         res = np.zeros(boolmatrix.shape, dtype=object)
         rows = np.apply_along_axis(lambda row: np.any(row), 1, boolmatrix).cumsum()
         seats = boolmatrix.cumsum(1)     # Получаем места в ряду реальные, накопленные слева направо
-        self.available_seats = set()
-        self.capacity = 0
         max_row = 0
         max_col = 0
         for y in range(boolmatrix.shape[0]):
@@ -180,7 +190,7 @@ class Mapping:
             except BadSeat:
                 pass
 
-    def get_aud_info(self):
+    def get_mapping_info(self):
         team_members = 0
         team_num = set()
         klass_count = dict([("n8", 0), ("n9", 0), ("n10", 0), ("n11", 0)])
@@ -194,6 +204,15 @@ class Mapping:
                     ("total", self.counter),
                     ("capacity", self.capacity)], **klass_count)
         return res
+
+    def __eq__(self, other):
+        """
+
+        :param other:
+        :return:
+        :type other: Mapping
+        """
+        return np.array_equal(self.m, other.m)
 
 
 class Auditory(SafeClass):
@@ -572,7 +591,7 @@ class Auditory(SafeClass):
         return self.inner_name == other.inner_name
 
     def info(self):
-        info = self.get_aud_info()
+        info = self.get_mapping_info()
         info["name"] = self.inner_name
         info["old_capacity"] = self.old_capacity
         info["av"] = "+" if self._settings["available"] else "-"
@@ -633,5 +652,23 @@ class Auditory(SafeClass):
         table = pd.DataFrame.from_records(self.get_all_seated())
         return table
 
+    def is_the_same_as(self, other):
+        """
+
+        :param other:
+        :return:
+        :type other: Auditory
+        """
+        if not self._seats_map == other._seats_map:
+            return False
+        if not self._settings == other._settings:
+            return False
+        if not self.inner_name == other.inner_name:
+            return False
+        if not self.outer_name == other.outer_name:
+            return False
+        if not self.info() == other.info():
+            return False
+        return True
 if __name__ == "__main__":
     pass

@@ -14,7 +14,6 @@ class Checker(SafeClass):
     settings = dict()
     allowed = set()
     _pre_inited = False
-    _settings_table = None
 
     _required_general_options = {"main_settings"}
 
@@ -143,3 +142,18 @@ class Checker(SafeClass):
                 if one["town"] != "Москва":
                     res &= one["town"] != two["town"]
         return res
+
+    def __eq__(self, other):
+        """
+
+        :param other:
+        :return:
+        :type other: Checker
+        """
+        if self._pre_inited != other._pre_inited:
+            return False
+        if self.settings != other.settings:
+            return False
+        if self.allowed != other.allowed:
+            return False
+        return True

@@ -1,11 +1,10 @@
 import random
-
 import numpy as np
 import pandas as pd
 import xlsxwriter
-from rassadka_modules.auditory import Auditory
+import pickle
 from pandas import ExcelFile
-
+from rassadka_modules.auditory import Auditory, Seat
 from rassadka_modules.check_system import Checker
 from rassadka_modules.excelprocessor.reader import splitter
 from rassadka_modules.rassadka_exceptions import *
@@ -32,13 +31,19 @@ class Controller:
                             ("aud", "Аудитория"), ("row", "Ряд"), ("col", "Место"),
                             ("town", "Город"), ("school", "Школа"), ("team", "Команда"),
                             ("klass", "Класс")])
-    people = None
-    inds = list()
-    teams = list()
-    seed = 1
 
-    def __init__(self, filename):
+    def __init__(self, filename, from_pickle=False):
+        if from_pickle:
+            data = pickle.load(open(filename, "rb"))
+            Checker.clean_global_init(data["checker_meta"])
+            Seat.counters = data["seats_meta"]
+            self.__dict__.update(data["controller"].__dict__)
+            return
+        self.people = None
         self.auds = list()
+        self.inds = list()
+        self.teams = list()
+        self.seed = 1
         found_main_settings = False
         excel_file = ExcelFile(filename)
         for name in excel_file.sheet_names:
@@ -106,6 +111,10 @@ class Controller:
         people["klass"] = people["klass"].apply(lambda x: get_numbers(x)[0])
         self.people = people
 
+    def clean_all(self):
+        for aud in self.auds:
+            aud.clean_all()
+
     def place_them(self):
         max_iter_number = 20
         random.seed(self.seed)
@@ -115,8 +124,7 @@ class Controller:
             for individual in self.inds:
                 self.rand_aud_insert(individual)
         except NoFreeAuditory:
-            for aud in self.auds:
-                aud.clean_all()
+            self.clean_all()
             if self.seed <= max_iter_number:
                 self.seed += 1
                 self.place_them()
@@ -165,3 +173,24 @@ class Controller:
             sheet = workbook.add_worksheet(aud.inner_name)
             aud.map_with_status_to_writer(sheet, form)
         workbook.close()
+
+    def to_pickle(self, path):
+        prepared = dict([("checker_meta", Checker.settings),
+                         ("seats_meta", Seat.counters),
+                         ("controller", self)])
+        with open(path, "wb") as f:
+            pickle.dump(prepared, f)
+
+    def __eq__(self, other):
+        """
+        проверяет все ключевые компоненты на совпадения
+        :param other:
+        :return:
+        :type other: Controller
+        """
+        if not self.checker == other.checker:
+            return False
+        for aud1, aud2 in zip(self.auds, other.auds):
+            if not aud1.is_the_same_as(aud2):
+                return False
+        return True
