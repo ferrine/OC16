@@ -9,7 +9,7 @@ from rassadka_modules.excelprocessor.reader import splitter
 if __name__ == "__main__":
     prefix = "test_out\\"
     # Обновить debug.txt
-    debugfile = RassadkaException.lg
+    debugfile = UserErrorException.lg
     if os.path.isfile(debugfile):
         os.remove(debugfile)
         print(debugfile + " updated")
@@ -30,7 +30,7 @@ if __name__ == "__main__":
         bad_set = splitter(bad_settings, True)
         try:
             bad = Auditory(bad_set, stress)
-        except RassadkaException:
+        except UserErrorException:
             print("caught {0}".format(stress))
     print("\nТест с аудиториями закончился\n")
     good_settings = pd.read_excel(goodpath, header=None, sheetname="Общие настройки")

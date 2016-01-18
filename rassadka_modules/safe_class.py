@@ -1,21 +1,6 @@
 import pandas as pd
 
 
-class Ch:
-        def __init__(self, func, description):
-            self.func = func
-            self.description = description
-
-        def __str__(self):
-            return str(self.description)
-
-        def __call__(self, *args, **kwargs):
-            if self.func is not None:
-                return self.func(*args, **kwargs)
-            else:
-                return True
-
-
 class SafeClass:
     @staticmethod
     def _check_settings(fact, req, way=">="):

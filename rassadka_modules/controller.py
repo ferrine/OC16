@@ -1,36 +1,25 @@
+import pickle
 import random
 import numpy as np
 import pandas as pd
 import xlsxwriter
-import pickle
+
 from pandas import ExcelFile
 from rassadka_modules.auditory import Auditory, Seat
 from rassadka_modules.check_system import Checker
+from rassadka_modules.common import clr, get_numbers, swap, mutable
 from rassadka_modules.excelprocessor.reader import splitter
 from rassadka_modules.rassadka_exceptions import *
+from rassadka_modules.safe_class import SafeClass
 
 
-def clr(x):
-    try:
-        return x.strip()
-    except AttributeError:
-        return x
-
-
-def get_numbers(string):
-    if isinstance(string, int):
-        return list([string])
-    elif isinstance(string, str):
-        return [int(s) for s in string.split() if s.isdigit()]
-
-
-class Controller:
-    _default_input_cols = ["email", "fam", "name", "otch", "town", "school", "team", "klass"]
+class Controller(SafeClass):
+    _required_input_cols = dict([("email", "email"), ("fam", "Фамилия"), ("name", "Имя"), ("otch", "Отчество"),
+                                 ("town", "Город"), ("school", "Школа"), ("team", "Команда"),
+                                 ("klass", "Класс")])
+    _default_rename = _required_input_cols.copy()
+    _default_rename.update([("aud", "Аудитория"), ("row", "Ряд"), ("col", "Место")])
     _default_output_cols = ["email", "fam", "name", "otch", "town", "school", "team", "klass", "aud", "row", "seat"]
-    _default_rename = dict([("fam", "Фамилия"), ("name", "Имя"), ("otch", "Отчество"),
-                            ("aud", "Аудитория"), ("row", "Ряд"), ("col", "Место"),
-                            ("town", "Город"), ("school", "Школа"), ("team", "Команда"),
-                            ("klass", "Класс")])
 
     def __init__(self, filename, from_pickle=False):
         if from_pickle:
@@ -39,7 +28,9 @@ class Controller:
             Seat.counters = data["seats_meta"]
             self.__dict__.update(data["controller"].__dict__)
             return
-        self.people = None
+        self.key_holder = set()
+        self.last_change = None
+        self.people = pd.DataFrame()
         self.auds = list()
         self.inds = list()
         self.teams = list()
@@ -87,15 +78,18 @@ class Controller:
         except EndLoopException:
             self._rand_loop_team_insert(data, available)
 
+    @mutable
     def rand_aud_insert(self, data):
         not_visited = set(self.auds)
         self._rand_loop_insert(data=data, available=not_visited)
 
+    @mutable
     def rand_aud_team_insert(self, data):
         not_visited = set(self.auds)
         self._rand_loop_team_insert(data=data, available=not_visited)
 
-    def split_people(self):
+    @mutable
+    def _split_people(self):
         self.inds = self.people.query("team == 'и'").to_dict(orient="records")
         if not self.checker.settings["com_in_one"]:
             self.inds.extend(self.people.query("team != 'и'").to_dict(orient="records"))
@@ -104,18 +98,55 @@ class Controller:
                 query = "team == " + str(team_number)
                 self.teams.append(self.people.query(query).to_dict(orient="records"))
 
+    @mutable
     def load_people(self, filename):
+        self.inds = list()
+        self.teams = list()
         people = pd.read_excel(filename, sheetname=0).applymap(clr)
-        # было бы неплохо тут все проверить на правильность ввода
-        people.columns = self._default_input_cols
+        if not self._check_settings(fact=set(people.columns),
+                                    req=set(self._required_input_cols.values()),
+                                    way="=="):
+            raise NotEnoughSettings(fact=set(people.columns),
+                                    req=set(self._required_input_cols.values()),
+                                    way="==")
+        people = people.rename(columns=swap(self._required_input_cols))
         people["klass"] = people["klass"].apply(lambda x: get_numbers(x)[0])
         self.people = people
+        self._split_people()
 
+    @mutable
     def clean_all(self):
         for aud in self.auds:
             aud.clean_all()
 
+    @mutable
+    def lock_all(self, key):
+        for aud in self.auds:
+            aud.lock_all(key)
+        self.key_holder.add(key)
+
+    @mutable
+    def unlock_all(self, key):
+        if key in self.key_holder:
+            for aud in self.auds:
+                aud.unlock_all(key)
+            self.key_holder.remove(key)
+        else:
+            raise KeyError(key)
+
+    @mutable
+    def erase_loaded_people(self):
+        self.people = pd.DataFrame()
+        self.inds = list()
+        self.teams = list()
+
+    @mutable
     def place_them(self):
+        if len(self.people) and len(self.seated_people):
+            if (set(self.people["email"])) & set(self.seated_people["email"]):
+                message = "{} загруженных участников рассажены!"
+                message = message.format(len(set(self.people["email"]) & set(self.seated_people["email"])))
+                raise ControllerException(message)
         max_iter_number = 20
         random.seed(self.seed)
         try:
@@ -130,6 +161,14 @@ class Controller:
                 self.place_them()
             else:
                 raise NoFreeAuditory("{0} итераций были безуспешны, слишком мало аудиторий".format(max_iter_number))
+
+    @property
+    def seated_people(self):
+        seated = list()
+        for aud in sorted(self.auds):
+                seated.extend(aud.get_all_seated())
+        frame = pd.DataFrame.from_dict(seated)
+        return frame
 
     def whole_summary(self):
         message = ""
@@ -147,12 +186,9 @@ class Controller:
 
     def dump_seated(self):
         filename = "Рассаженные участники.xlsx"
-        seated = list()
-        for aud in sorted(self.auds):
-                seated.extend(aud.get_all_seated())
-        frame = pd.DataFrame.from_dict(seated)
         select = ["fam", "name", "otch", "aud", "row", "col"]
-        frame.ix[:, select].sort_values("fam", ascending=True).rename(columns=self._default_rename).to_excel(filename)
+        frame = self.seated_people
+        frame.ix[:, select].sort_values("fam", ascending=True).rename(columns=self._default_rename).to_excel(filename, index=False)
 
     def write_maps_with_data(self, wbname, data):
         workbook = xlsxwriter.Workbook(wbname)
@@ -181,16 +217,23 @@ class Controller:
         with open(path, "wb") as f:
             pickle.dump(prepared, f)
 
-    def __eq__(self, other):
-        """
-        проверяет все ключевые компоненты на совпадения
-        :param other:
-        :return:
-        :type other: Controller
-        """
-        if not self.checker == other.checker:
-            return False
-        for aud1, aud2 in zip(self.auds, other.auds):
-            if not aud1.is_the_same_as(aud2):
-                return False
-        return True
+    @property
+    def info(self):
+        info = dict()
+        info["last_change"] = self.last_change
+        info["n_auds"] = len(self.auds)
+        info["n_used_auds"] = sum([aud.settings["available"] for aud in self.auds])
+        info["seated"] = Seat.counters["seated"]
+        info["seats_total"] = Seat.counters["total"]
+        info["people"] = len(self.people)
+        info["n_teams"] = len(self.teams)
+        return info
+
+    def __str__(self):
+        message = """
+Последнее изменение {last_change}
+Всего аудиторий {n_used_auds}({n_auds: 4})
+Загружено {people} человек, {n_teams} команд
+Всего мест {seats_total: <4}, посажено {seated}
+        """.format(**self.info)
+        return message

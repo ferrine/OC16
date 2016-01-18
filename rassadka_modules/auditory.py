@@ -6,14 +6,17 @@ import pandas as pd
 
 from rassadka_modules.check_system import Checker
 from rassadka_modules.rassadka_exceptions import *
-from rassadka_modules.safe_class import SafeClass, Ch
+from rassadka_modules.safe_class import SafeClass
+from rassadka_modules.common import Ch
 
 
 class Seat:
-    counters = dict([("counter", 0),
+    counters = dict([("seated", 0),
                      ("total", 0)])
 
     def __init__(self, yx, status, data=None, audname=None):
+        self.locked = False
+        self.lock_key = None
         self.aud = audname
         self.yx = yx
         self.status = bool(status)
@@ -26,7 +29,7 @@ class Seat:
 
     @classmethod
     def count_seated(cls):
-        return cls.counters["counter"]
+        return cls.counters["seated"]
 
     @classmethod
     def _plus_total(cls):
@@ -38,11 +41,11 @@ class Seat:
 
     @classmethod
     def _plus(cls):
-        cls.counters["counter"] += 1
+        cls.counters["seated"] += 1
 
     @classmethod
     def _minus(cls):
-        cls.counters["counter"] -= 1
+        cls.counters["seated"] -= 1
 
     def switch_on(self):
         if not self.status:
@@ -67,6 +70,8 @@ class Seat:
         self._plus()
 
     def remove(self):
+        if self.locked:
+            raise BadSeat("Место заблокировано!")
         if not self.status:
             raise BadSeat("Место не задействовано!")
         if self.data is None:
@@ -93,16 +98,15 @@ class Seat:
             res["row"], res["col"] = self.yx
             return res
 
-    def __eq__(self, other):
-        """
+    def lock(self, key):
+        if self.data and not self.locked:
+            self.locked = True
+            self.lock_key = key
 
-        :param other:
-        :type other: Seat
-        :return:
-        """
-        if not self.data == other.data:
-            return False
-        return True
+    def unlock(self, key):
+        if self.locked and key == self.lock_key:
+            self.locked = False
+            self.lock_key = None
 
 
 class Mapping:
@@ -165,6 +169,12 @@ class Mapping:
         self.m[yx].remove()
         self._minus(yx)
 
+    def lock(self, yx, key):
+        self.m[yx].lock(key)
+
+    def unlock(self, yx, key):
+        self.m[yx].unlock(key)
+
     def get_data(self, yx):
         try:
             return self.m[yx].data
@@ -190,6 +200,20 @@ class Mapping:
             except BadSeat:
                 pass
 
+    def lock_all(self, key):
+        for yx in product(range(self.m.shape[0]), range(self.m.shape[1])):
+            try:
+                self.lock(yx, key)
+            except BadSeat:
+                pass
+
+    def unlock_all(self, key):
+        for yx in product(range(self.m.shape[0]), range(self.m.shape[1])):
+            try:
+                self.unlock(yx, key)
+            except BadSeat:
+                pass
+
     def get_mapping_info(self):
         team_members = 0
         team_num = set()
@@ -204,15 +228,6 @@ class Mapping:
                     ("total", self.counter),
                     ("capacity", self.capacity)], **klass_count)
         return res
-
-    def __eq__(self, other):
-        """
-
-        :param other:
-        :return:
-        :type other: Mapping
-        """
-        return np.array_equal(self.m, other.m)
 
 
 class Auditory(SafeClass):
@@ -352,12 +367,12 @@ class Auditory(SafeClass):
                                            req=self._required_settings_values_condition,
                                            name="Проверка валидности ввода настроек в таблицу",
                                            aud=self.outer_name)
-        self._settings = settings["code"].to_dict()
+        self.settings = settings["code"].to_dict()
         self._settings_table = settings
-        self.inner_name = str(self._settings["name"])
+        self.inner_name = str(self.settings["name"])
         restricted = set()
         for cl in ["class_8", "class_9", "class_10", "class_11"]:
-            if not self._settings[cl]:
+            if not self.settings[cl]:
                 restricted.add(cl)
         self.restricted_klasses = restricted
 
@@ -451,7 +466,7 @@ class Auditory(SafeClass):
                                     aud=self.outer_name)
         seats_map[seats_map == self._required_seats_values["seat"]] = True
         seats_map[seats_map == self._required_seats_values["not_allowed"]] = False
-        self._seats_map = Mapping(seats_map, str(self._settings["name"]))
+        self._seats_map = Mapping(seats_map, str(self.settings["name"]))
         self._create_paths()
 
     @staticmethod
@@ -493,7 +508,7 @@ class Auditory(SafeClass):
             school_yx = self._read_school(raw_settings["school"])
             self._init_seats(raw_settings["seats"])
             self.klass_school_town_dyx = self._eval_map_conditions(school=school_yx, klass=klass_yx)
-        except RassadkaException as e:
+        except UserErrorException as e:
             e.log_error()
             raise e
 
@@ -508,7 +523,7 @@ class Auditory(SafeClass):
 {2}
 ------------Checker:------------
 {3}
-""".format(self._settings, self.shape,
+""".format(self.settings, self.shape,
            self.klass_school_town_dyx,
            self.checker)
         return res
@@ -539,15 +554,15 @@ class Auditory(SafeClass):
 
     def rand_insert(self, data):
         # доступна ли аудитория вообще?
-        if not self._settings["available"]:
+        if not self.settings["available"]:
             raise EndLoopException
         # Проверка, можно ли сажать данного участника
         # Критерий "командный/индивидуальный"
         if data["team"] == "и":
-            if not self._settings["individual"]:
+            if not self.settings["individual"]:
                 raise EndLoopException
         else:
-            if not self._settings["command"]:
+            if not self.settings["command"]:
                 raise EndLoopException
         # Критерий по классу
         if data["klass"] in self.restricted_klasses:
@@ -594,13 +609,13 @@ class Auditory(SafeClass):
         info = self.get_mapping_info()
         info["name"] = self.inner_name
         info["old_capacity"] = self.old_capacity
-        info["av"] = "+" if self._settings["available"] else "-"
-        info["com"] = "+" if self._settings["command"] else "-"
-        info["ind"] = "+" if self._settings["individual"] else "-"
-        info["kl8"] = "+" if self._settings["class_8"] else "-"
-        info["kl9"] = "+" if self._settings["class_9"] else "-"
-        info["kl10"] = "+" if self._settings["class_10"] else "-"
-        info["kl11"] = "+" if self._settings["class_11"] else "-"
+        info["av"] = "+" if self.settings["available"] else "-"
+        info["com"] = "+" if self.settings["command"] else "-"
+        info["ind"] = "+" if self.settings["individual"] else "-"
+        info["kl8"] = "+" if self.settings["class_8"] else "-"
+        info["kl9"] = "+" if self.settings["class_9"] else "-"
+        info["kl10"] = "+" if self.settings["class_10"] else "-"
+        info["kl11"] = "+" if self.settings["class_11"] else "-"
         return info
 
     def summary(self):
@@ -652,23 +667,5 @@ class Auditory(SafeClass):
         table = pd.DataFrame.from_records(self.get_all_seated())
         return table
 
-    def is_the_same_as(self, other):
-        """
-
-        :param other:
-        :return:
-        :type other: Auditory
-        """
-        if not self._seats_map == other._seats_map:
-            return False
-        if not self._settings == other._settings:
-            return False
-        if not self.inner_name == other.inner_name:
-            return False
-        if not self.outer_name == other.outer_name:
-            return False
-        if not self.info() == other.info():
-            return False
-        return True
 if __name__ == "__main__":
     pass

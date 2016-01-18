@@ -3,7 +3,8 @@ from itertools import permutations
 import pandas as pd
 
 from rassadka_modules.rassadka_exceptions import *
-from rassadka_modules.safe_class import SafeClass, Ch
+from rassadka_modules.safe_class import SafeClass
+from rassadka_modules.common import Ch
 
 
 class Checker(SafeClass):
@@ -98,7 +99,7 @@ class Checker(SafeClass):
                                         aud=cls.outer_name)
             cls._init_settings(raw_settings["main_settings"])
             cls._eval_klass_conditions()
-        except RassadkaException as e:
+        except UserErrorException as e:
             print(e)
             e.log_error()
         cls._pre_inited = True

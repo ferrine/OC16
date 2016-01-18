@@ -1,23 +1,31 @@
 import datetime
 
 
-class CheckIsFalse(Exception):
+class ControllerException(Exception):
     pass
 
 
-class BadSeat(Exception):
+class CheckerException(ControllerException):
     pass
 
 
-class EndLoopException(Exception):
+class CheckIsFalse(CheckerException):
     pass
 
 
-class NoFreeAuditory(Exception):
+class BadSeat(CheckerException):
     pass
 
 
-class RassadkaException(Exception):
+class EndLoopException(CheckerException):
+    pass
+
+
+class NoFreeAuditory(CheckerException):
+    pass
+
+
+class UserErrorException(ControllerException):
     lg = "debug.txt"
     situation = "Основное исключение"
 
@@ -63,7 +71,7 @@ class RassadkaException(Exception):
         return self.message()
 
 
-class NotEnoughSettings(RassadkaException):
+class NotEnoughSettings(UserErrorException):
     def __init__(self, way=">=", **kwargs):
         super().__init__(**kwargs)
         self.way = way
@@ -89,7 +97,7 @@ class NotEnoughSettings(RassadkaException):
         return mes
 
 
-class ValuesConditionException(RassadkaException):
+class ValuesConditionException(UserErrorException):
     situation = "Входные данные не допустимы"
 
     def message(self):
@@ -104,7 +112,7 @@ class ValuesConditionException(RassadkaException):
         return mes
 
 
-class WrongMatrixInputException(RassadkaException):
+class WrongMatrixInputException(UserErrorException):
     situation = "Неправильный матричный ввод"
     problem = "Неправильное представление"
 

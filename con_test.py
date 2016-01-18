@@ -9,7 +9,6 @@ def test(con):
     people = "exceltestdata/people.xlsx"
     print("getting people")
     con.load_people(people)
-    con.split_people()
     print("got people")
     print("rassadka...")
     try:
