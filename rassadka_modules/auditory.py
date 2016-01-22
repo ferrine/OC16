@@ -109,6 +109,13 @@ class Seat:
             self.locked = False
             self.lock_key = None
 
+    def update(self, new_data, forced):
+        if not self.status:
+            raise ControllerException("Permission to {0} {1} {2} denied".format(self.aud, *self.yx))
+        if self.locked and not forced:
+            raise ControllerException("Permission to {0} {1} {2} denied".format(self.aud, *self.yx))
+        self.data = new_data
+
 
 class Mapping:
     def __getattr__(self, item):
@@ -120,7 +127,7 @@ class Mapping:
         self.inner_name = inner_name
         self.available_seats = set()
         self.capacity = 0
-        self.real_seats = dict()
+        self.coords_to_yx = dict()
         res = np.zeros(boolmatrix.shape, dtype=object)
         rows = np.apply_along_axis(lambda row: np.any(row), 1, boolmatrix).cumsum()
         seats = boolmatrix.cumsum(1)     # Получаем места в ряду реальные, накопленные слева направо
@@ -133,7 +140,7 @@ class Mapping:
                                  status=boolmatrix[y, x],
                                  audname=self.inner_name)
                 if boolmatrix[y, x]:
-                    self.real_seats[coords] = res[y, x]
+                    self.coords_to_yx[coords] = (y, x)
                     self._plus_capacity((y, x))
                     max_row = max(max_row, y)
                     max_col = max(max_col, x)
@@ -169,6 +176,9 @@ class Mapping:
         self.m[yx].insert(data)
         self._plus(yx)
 
+    def update(self, yx, new_data, forced):
+        self.m[yx].update(new_data, forced)
+
     def remove(self, yx):
         self.m[yx].remove()
         self._minus(yx)
@@ -178,6 +188,12 @@ class Mapping:
 
     def unlock(self, yx, key):
         self.m[yx].unlock(key)
+
+    def update_by_position(self, coords, new_data, forced=False):
+        if self.m[self.coords_to_yx[coords]]:
+            self.update(self.coords_to_yx[coords], new_data, forced)
+        else:
+            self.insert(self.coords_to_yx[coords], new_data)
 
     def get_data(self, yx):
         try:

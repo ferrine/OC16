@@ -1,6 +1,6 @@
 import datetime
 import unicodedata
-
+from collections import OrderedDict as oDict
 
 def mutable(method):
     """
@@ -24,13 +24,6 @@ def clr(x):
         return x
 
 
-def get_numbers(string):
-    if isinstance(string, int):
-        return list([string])
-    elif isinstance(string, str):
-        return [int(s) for s in string.split() if s.isdigit()]
-
-
 class Ch:
         def __init__(self, func, description):
             self.func = func
@@ -47,4 +40,4 @@ class Ch:
 
 
 def swap(d):
-    return dict([(v, k) for k, v in d.items()])
+    return oDict([(v, k) for k, v in d.items()])

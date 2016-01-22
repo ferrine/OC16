@@ -1,6 +1,6 @@
 from rassadka_modules.controller import Controller
 import pickle
-from tests import con_test
+from tests import con_test, main, saving
 import sys
 
 
@@ -14,10 +14,6 @@ if __name__ == "__main__":
               con.seat_by_position(con.seated_people.iloc[0].to_dict()).aud,
               con.seat_by_position(con.seated_people.iloc[0].to_dict()))
         sys.exit(0)
-    settings = "exceltestdata/settings.xlsx"
-    print("getting settings")
-    con = Controller(open(settings, "rb"))
-    print(con.checker.settings, con.checker.allowed, sep="\n")
-    con_test(con)
-    print("dumping")
-    con.to_pickle(open(filename, "wb"))
+    main()
+    con_test()
+    saving()

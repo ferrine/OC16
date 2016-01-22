@@ -5,21 +5,22 @@ import pandas as pd
 import xlsxwriter
 
 from pandas import ExcelFile
+from collections import OrderedDict as oDict
 from rassadka_modules.auditory import Auditory, Seat
 from rassadka_modules.check_system import Checker
-from rassadka_modules.common import clr, get_numbers, swap, mutable
+from rassadka_modules.common import clr, swap, mutable
 from rassadka_modules.excelprocessor.reader import splitter
 from rassadka_modules.rassadka_exceptions import *
 from rassadka_modules.safe_class import SafeClass
 
 
 class Controller(SafeClass):
-    _required_input_cols = dict([("email", "email"), ("fam", "Фамилия"), ("name", "Имя"), ("otch", "Отчество"),
+    _required_input_cols = oDict([("email", "email"), ("fam", "Фамилия"), ("name", "Имя"), ("otch", "Отчество"),
                                  ("town", "Город"), ("school", "Школа"), ("team", "Команда"),
                                  ("klass", "Класс")])
-    _default_rename = _required_input_cols.copy()
-    _default_rename.update([("aud", "Аудитория"), ("row", "Ряд"), ("col", "Место")])
-    _default_output_cols = ["email", "fam", "name", "otch", "town", "school", "team", "klass", "aud", "row", "seat"]
+    _default_full_dict = _required_input_cols.copy()
+    _default_full_dict.update([("aud", "Аудитория"), ("row", "Ряд"), ("col", "Место")])
+    max_iter = 20
 
     def __init__(self, file, from_pickle=False):
         if from_pickle:
@@ -28,6 +29,7 @@ class Controller(SafeClass):
             Seat.counters = data["seats_meta"]
             self.__dict__.update(data["controller"].__dict__)
             return
+        self.mode = "None"
         self.key_holder = set()
         self.last_change = None
         self.people = pd.DataFrame()
@@ -91,27 +93,38 @@ class Controller(SafeClass):
 
     @mutable
     def _split_people(self):
-        self.inds = self.people.query("team == 'и'").to_dict(orient="records")
+        tmp = self.people.drop(["aud", "row", "col"], errors="ignore", axis=1)
+        self.inds = tmp.query("team == 'и'").to_dict(orient="records")
         if not self.checker.settings["com_in_one"]:
-            self.inds.extend(self.people.query("team != 'и'").to_dict(orient="records"))
+            self.inds.extend(tmp.query("team != 'и'").to_dict(orient="records"))
         else:
-            for team_number in list(np.unique(self.people.query("team != 'и'")["team"])):
+            for team_number in list(np.unique(tmp.query("team != 'и'")["team"])):
                 query = "team == " + str(team_number)
-                self.teams.append(self.people.query(query).to_dict(orient="records"))
+                self.teams.append(tmp.query(query).to_dict(orient="records"))
 
     @mutable
-    def load_people(self, filename):
+    def load_people(self, file):
         self.inds = list()
         self.teams = list()
-        people = pd.read_excel(filename, sheetname=0).applymap(clr)
+        people = pd.read_excel(file, sheetname=0).applymap(clr)
         if not self._check_settings(fact=set(people.columns),
                                     req=set(self._required_input_cols.values()),
-                                    way="=="):
+                                    way=">="):
             raise NotEnoughSettings(fact=set(people.columns),
                                     req=set(self._required_input_cols.values()),
-                                    way="==")
-        people = people.rename(columns=swap(self._required_input_cols))
-        people["klass"] = people["klass"].apply(lambda x: get_numbers(x)[0])
+                                    way=">=")
+        people = people.rename(columns=swap(self._default_full_dict))
+        if (any([item in people.columns for item in ["aud", "row", "col"]]) and
+           not all([item in people.columns for item in ["aud", "row", "col"]])):
+            raise ControllerException("Некорректно заданы столбцы с местами")
+        if len(people) == 0:
+            self.mode = "None"
+            return
+        elif "aud" in people.columns:
+            self.mode = "edit"
+        else:
+            self.mode = "input"
+        people["klass"] = people["klass"]
         self.people = people
         self._split_people()
 
@@ -136,10 +149,20 @@ class Controller(SafeClass):
             raise KeyError(key)
 
     @mutable
+    def update_all(self, forced=False):
+        if not self.mode == "edit":
+            raise ControllerException("PermissionError")
+        for new_data in self.people.to_dict(orient="records"):
+            for_insert = new_data.copy()
+            del for_insert["aud"], for_insert["row"], for_insert["col"]
+            self.auds[new_data["aud"]].update_by_position((new_data["row"], new_data["col"]), for_insert, forced=forced)
+
+    @mutable
     def erase_loaded_people(self):
         self.people = pd.DataFrame()
         self.inds = list()
         self.teams = list()
+        self.mode = "None"
 
     @mutable
     def place_them(self):
@@ -148,7 +171,6 @@ class Controller(SafeClass):
                 message = "{} загруженных участников рассажены!"
                 message = message.format(len(set(self.people["email"]) & set(self.seated_people["email"])))
                 raise ControllerException(message)
-        max_iter_number = 20
         random.seed(self.seed)
         try:
             for team in self.teams:
@@ -157,11 +179,11 @@ class Controller(SafeClass):
                 self.rand_aud_insert(individual)
         except NoFreeAuditory:
             self.clean_all()
-            if self.seed <= max_iter_number:
+            if self.seed <= self.max_iter:
                 self.seed += 1
                 self.place_them()
             else:
-                raise NoFreeAuditory("{0} итераций были безуспешны, слишком мало аудиторий".format(max_iter_number))
+                raise NoFreeAuditory("{0} итераций были безуспешны, слишком мало аудиторий".format(self.max_iter))
 
     @property
     def seated_people(self):
@@ -185,11 +207,14 @@ class Controller(SafeClass):
             table = pd.DataFrame.from_records(summary, index="name")
             table.ix[:, Auditory.export_names.keys()].rename(columns=Auditory.export_names).to_excel(writer)
 
-    def dump_seated(self, file):
+    def dump_seated(self, file, full=False):
         with pd.ExcelWriter(file) as writer:
-            select = ["fam", "name", "otch", "aud", "row", "col"]
+            if not full:
+                select = ["fam", "name", "otch", "aud", "row", "col"]
+            else:
+                select = list(self._default_full_dict.keys())
             frame = self.seated_people
-            frame.ix[:, select].sort_values("fam", ascending=True).rename(columns=self._default_rename).to_excel(writer, index=False)
+            frame.ix[:, select].sort_values("fam", ascending=True).rename(columns=self._default_full_dict).to_excel(writer, index=False)
 
     def write_maps_with_data(self, file, data):
         with xlsxwriter.Workbook(file) as workbook:
@@ -232,9 +257,11 @@ class Controller(SafeClass):
 Последнее изменение {last_change}
 Всего аудиторий {n_used_auds}({n_auds: 4})
 Загружено {people} человек, {n_teams} команд
-Всего мест {seats_total: <4}, посажено {seated}
+Всего мест {seats_total}, посажено {seated}
         """.format(**self.info)
         return message
 
     def seat_by_position(self, seat):
-        return self.auds[seat["aud"]].real_seats[(seat["row"], seat["col"])]
+        if not isinstance(seat["row"], int) and isinstance(seat["col"], int):
+            raise ControllerException("Место/Ряд должны быть числами")
+        return self.auds[str(seat["aud"])].real_seats[(seat["row"], seat["col"])]
