@@ -21,9 +21,9 @@ class Controller(SafeClass):
     _default_rename.update([("aud", "Аудитория"), ("row", "Ряд"), ("col", "Место")])
     _default_output_cols = ["email", "fam", "name", "otch", "town", "school", "team", "klass", "aud", "row", "seat"]
 
-    def __init__(self, filename, from_pickle=False):
+    def __init__(self, file, from_pickle=False):
         if from_pickle:
-            data = pickle.load(open(filename, "rb"))
+            data = pickle.load(file)
             Checker.clean_global_init(data["checker_meta"])
             Seat.counters = data["seats_meta"]
             self.__dict__.update(data["controller"].__dict__)
@@ -31,18 +31,18 @@ class Controller(SafeClass):
         self.key_holder = set()
         self.last_change = None
         self.people = pd.DataFrame()
-        self.auds = list()
+        self.auds = dict()
         self.inds = list()
         self.teams = list()
         self.seed = 1
         found_main_settings = False
-        excel_file = ExcelFile(filename)
+        excel_file = ExcelFile(file)
         for name in excel_file.sheet_names:
             raw_frame = excel_file.parse(name, index_col=None, header=None)
             unresolved_dict = splitter(raw_frame, named=True)
             if "main_settings" in unresolved_dict.keys():
                 if found_main_settings:
-                    print("В {0} две страницы с общими настройками".format(filename))
+                    print("Две страницы с общими настройками!")
                     continue
                 found_main_settings = True
                 Checker.raw_global_init(unresolved_dict)
@@ -53,10 +53,11 @@ class Controller(SafeClass):
             raw_frame = excel_file.parse(name, index_col=None, header=None)
             unresolved_dict = splitter(raw_frame, named=True)
             if "main_settings" not in unresolved_dict.keys():
-                self.auds.append(Auditory(unresolved_dict, outer_name=name))
-        all_names = [aud.inner_name for aud in self.auds]
-        if len(all_names) < len(np.unique(all_names)):
-            raise TypeError("В {0} есть одинаковые аудитории".format(filename))
+                tmp = Auditory(unresolved_dict, outer_name=name)
+                if tmp.inner_name in self.auds.keys():
+                    raise TypeError("Есть одинаковые аудитории")
+                else:
+                    self.auds[tmp.inner_name] = tmp
 
     def _rand_loop_insert(self, data, available):
         if not available:
@@ -80,12 +81,12 @@ class Controller(SafeClass):
 
     @mutable
     def rand_aud_insert(self, data):
-        not_visited = set(self.auds)
+        not_visited = set(self.auds.values())
         self._rand_loop_insert(data=data, available=not_visited)
 
     @mutable
     def rand_aud_team_insert(self, data):
-        not_visited = set(self.auds)
+        not_visited = set(self.auds.values())
         self._rand_loop_team_insert(data=data, available=not_visited)
 
     @mutable
@@ -116,19 +117,19 @@ class Controller(SafeClass):
 
     @mutable
     def clean_all(self):
-        for aud in self.auds:
+        for aud in self.auds.values():
             aud.clean_all()
 
     @mutable
     def lock_all(self, key):
-        for aud in self.auds:
+        for aud in self.auds.values():
             aud.lock_all(key)
         self.key_holder.add(key)
 
     @mutable
     def unlock_all(self, key):
         if key in self.key_holder:
-            for aud in self.auds:
+            for aud in self.auds.values():
                 aud.unlock_all(key)
             self.key_holder.remove(key)
         else:
@@ -165,64 +166,61 @@ class Controller(SafeClass):
     @property
     def seated_people(self):
         seated = list()
-        for aud in sorted(self.auds):
+        for aud in sorted(self.auds.values()):
                 seated.extend(aud.get_all_seated())
         frame = pd.DataFrame.from_dict(seated)
         return frame
 
     def whole_summary(self):
         message = ""
-        for aud in sorted(self.auds):
+        for aud in sorted(self.auds.values()):
             message += aud.summary() + "\n"
         return message
 
-    def xlsx_summary(self):
-        filename = "Сводка по аудиториям.xlsx"
-        summary = list()
-        for aud in self.auds:
-            summary.append(aud.info())
-        table = pd.DataFrame.from_records(summary, index="name")
-        table.ix[:, Auditory.info_order].to_excel(filename)
+    def xlsx_summary(self, file):
+        with pd.ExcelWriter(file) as writer:
+            summary = list()
+            for aud in self.auds.values():
+                summary.append(aud.info())
+            table = pd.DataFrame.from_records(summary, index="name")
+            table.ix[:, Auditory.export_names.keys()].rename(columns=Auditory.export_names).to_excel(writer)
 
-    def dump_seated(self):
-        filename = "Рассаженные участники.xlsx"
-        select = ["fam", "name", "otch", "aud", "row", "col"]
-        frame = self.seated_people
-        frame.ix[:, select].sort_values("fam", ascending=True).rename(columns=self._default_rename).to_excel(filename, index=False)
+    def dump_seated(self, file):
+        with pd.ExcelWriter(file) as writer:
+            select = ["fam", "name", "otch", "aud", "row", "col"]
+            frame = self.seated_people
+            frame.ix[:, select].sort_values("fam", ascending=True).rename(columns=self._default_rename).to_excel(writer, index=False)
 
-    def write_maps_with_data(self, wbname, data):
-        workbook = xlsxwriter.Workbook(wbname)
-        form = workbook.add_format()
-        form.set_font_size(30)
-        form.set_bold()
-        for aud in self.auds:
-            sheet = workbook.add_worksheet(aud.inner_name)
-            aud.map_with_data_to_writer(sheet, form, data)
-        workbook.close()
+    def write_maps_with_data(self, file, data):
+        with xlsxwriter.Workbook(file) as workbook:
+            form = workbook.add_format()
+            form.set_font_size(30)
+            form.set_bold()
+            for aud in self.auds.values():
+                sheet = workbook.add_worksheet(aud.inner_name)
+                aud.map_with_data_to_writer(sheet, form, data)
 
-    def write_maps_with_status(self, wbname):
-        workbook = xlsxwriter.Workbook(wbname)
-        form = workbook.add_format()
-        form.set_font_size(30)
-        form.set_bold()
-        for aud in self.auds:
-            sheet = workbook.add_worksheet(aud.inner_name)
-            aud.map_with_status_to_writer(sheet, form)
-        workbook.close()
+    def write_maps_with_status(self, file):
+        with xlsxwriter.Workbook(file) as workbook:
+            form = workbook.add_format()
+            form.set_font_size(30)
+            form.set_bold()
+            for aud in self.auds.values():
+                sheet = workbook.add_worksheet(aud.inner_name)
+                aud.map_with_status_to_writer(sheet, form)
 
-    def to_pickle(self, path):
+    def to_pickle(self, file):
         prepared = dict([("checker_meta", Checker.settings),
                          ("seats_meta", Seat.counters),
                          ("controller", self)])
-        with open(path, "wb") as f:
-            pickle.dump(prepared, f)
+        pickle.dump(prepared, file)
 
     @property
     def info(self):
         info = dict()
         info["last_change"] = self.last_change
         info["n_auds"] = len(self.auds)
-        info["n_used_auds"] = sum([aud.settings["available"] for aud in self.auds])
+        info["n_used_auds"] = sum([aud.settings["available"] for aud in self.auds.values()])
         info["seated"] = Seat.counters["seated"]
         info["seats_total"] = Seat.counters["total"]
         info["people"] = len(self.people)
@@ -237,3 +235,6 @@ class Controller(SafeClass):
 Всего мест {seats_total: <4}, посажено {seated}
         """.format(**self.info)
         return message
+
+    def seat_by_position(self, seat):
+        return self.auds[seat["aud"]].real_seats[(seat["row"], seat["col"])]

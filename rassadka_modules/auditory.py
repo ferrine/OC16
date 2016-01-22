@@ -8,6 +8,7 @@ from rassadka_modules.check_system import Checker
 from rassadka_modules.rassadka_exceptions import *
 from rassadka_modules.safe_class import SafeClass
 from rassadka_modules.common import Ch
+from collections import OrderedDict as oDict
 
 
 class Seat:
@@ -119,6 +120,7 @@ class Mapping:
         self.inner_name = inner_name
         self.available_seats = set()
         self.capacity = 0
+        self.real_seats = dict()
         res = np.zeros(boolmatrix.shape, dtype=object)
         rows = np.apply_along_axis(lambda row: np.any(row), 1, boolmatrix).cumsum()
         seats = boolmatrix.cumsum(1)     # Получаем места в ряду реальные, накопленные слева направо
@@ -126,10 +128,12 @@ class Mapping:
         max_col = 0
         for y in range(boolmatrix.shape[0]):
             for x in range(boolmatrix.shape[1]):
-                res[y, x] = Seat(yx=(int(rows[y]), int(seats[y, x])),
+                coords = (int(rows[y]), int(seats[y, x]))
+                res[y, x] = Seat(yx=coords,
                                  status=boolmatrix[y, x],
                                  audname=self.inner_name)
                 if boolmatrix[y, x]:
+                    self.real_seats[coords] = res[y, x]
                     self._plus_capacity((y, x))
                     max_row = max(max_row, y)
                     max_col = max(max_col, x)
@@ -252,8 +256,10 @@ class Auditory(SafeClass):
     Имеется ввиду поддержка двойной нумерации, абсолютной для метода проверки
     и относительной для вывода на печать рассадки
     """
-    info_order = ["old_capacity", "capacity", "total", "teams", "team_members",
-                  "n8", "n9", "n10", "n11"]
+    export_names = oDict([("old_capacity", "Вместительность"), ("capacity", "Вместительность с доп проходами"),
+                          ("total", "Всего сидит"), ("teams", "Всего команд"),
+                          ("team_members", "Всего командных участников"),
+                          ("n8", "8кл"), ("n9", "9кл"), ("n10", "10кл"), ("n11", "11кл")])
 
     _required_general_options = {"settings", "seats", "klass", "school"}
 
