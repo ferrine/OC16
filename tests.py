@@ -4,7 +4,7 @@ from rassadka_modules import rassadka_exceptions
 from rassadka_modules.controller import Controller
 
 
-def test(con):
+def con_test(con):
     prefix = "test_out\\"
     people = "exceltestdata/people.xlsx"
     print("getting people")
@@ -17,7 +17,7 @@ def test(con):
     except rassadka_exceptions.NoFreeAuditory:
         print("...bad end")
     print("making xlsx file...")
-    con.dump_seated()
+    con.dump_seated(open(prefix + "Рассаженные участники.xlsx", "wb"))
     print("done")
     print("printing self...")
     print(con.whole_summary(), file=open(prefix + "whole_sum.txt", "w"))
@@ -26,10 +26,9 @@ def test(con):
         pickle.dump(con, d)
     print("loading self...")
     n = pickle.load(open(prefix + "to_pickle.pkl", "rb"))
-    print(n.auds)
-    n.write_maps_with_data(prefix + "with_klass.xlsx", "klass")
-    n.write_maps_with_status(prefix + "with_status.xlsx")
-    n.xlsx_summary()
+    n.write_maps_with_data(open(prefix + "with_klass.xlsx", "wb"), "klass")
+    n.write_maps_with_status(open(prefix + "with_status.xlsx", "wb"))
+    n.xlsx_summary(open(prefix + "Статистика по аудиториям.xlsx", "wb"))
 
 
 if __name__ == "__main__":
@@ -37,6 +36,6 @@ if __name__ == "__main__":
     settings = "exceltestdata/settings.xlsx"
 
     print("getting settings")
-    con = Controller(settings)
+    con = Controller(open(settings, "rb"))
     print("got settings")
-    test(con)
+    con_test(con)
