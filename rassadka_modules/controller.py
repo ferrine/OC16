@@ -158,6 +158,13 @@ class Controller(SafeClass):
             self.auds[new_data["aud"]].update_by_position((new_data["row"], new_data["col"]), for_insert, forced=forced)
 
     @mutable
+    def selected_remove(self):
+        if not self.mode == "edit":
+            raise ControllerException("PermissionError")
+        for remove_data in self.people.to_dict(orient="records"):
+            self.auds[remove_data["aud"]].remove_by_position((remove_data["row"], remove_data["col"]))
+
+    @mutable
     def erase_loaded_people(self):
         self.people = pd.DataFrame()
         self.inds = list()

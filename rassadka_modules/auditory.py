@@ -195,6 +195,9 @@ class Mapping:
         else:
             self.insert(self.coords_to_yx[coords], new_data)
 
+    def remove_by_position(self, coords):
+        self.remove(self.coords_to_yx[coords])
+
     def get_data(self, yx):
         try:
             return self.m[yx].data
