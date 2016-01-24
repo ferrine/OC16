@@ -1,9 +1,8 @@
 import random
-from itertools import product
-
 import numpy as np
 import pandas as pd
 
+from itertools import product
 from rassadka_modules.check_system import Checker
 from rassadka_modules.rassadka_exceptions import *
 from rassadka_modules.safe_class import SafeClass
@@ -61,15 +60,15 @@ class Seat:
         cls.counters["arrived"] -= 1
 
     @classmethod
-    def total_seated(cls):
+    def total_seated(cls) -> int:
         return cls.counters["seated"]
 
     @classmethod
-    def total_seats(cls):
+    def total_seats(cls) -> int:
         return cls.counters["total"]
 
     @classmethod
-    def total_arrived(cls):
+    def total_arrived(cls) -> int:
         return cls.counters["arrived"]
 
     def switch_on(self):
@@ -142,7 +141,7 @@ class Seat:
         if "arrived" not in self.data.keys:
             self.data["arrived"] = False
 
-    def get_placed(self):
+    def get_placed(self) -> dict:
         if self.data:
             res = self.data.copy()
             res["aud"] = self.aud
@@ -228,7 +227,7 @@ class Mapping:
     def unlock(self, yx, key):
         self.m[yx].unlock(key)
 
-    def seat_by_coords(self, coords):
+    def seat_by_coords(self, coords) -> Seat:
         return self.m[self.coords_to_yx[coords]]
 
     def update_by_coords(self, coords, new_data, forced=False):
@@ -240,13 +239,13 @@ class Mapping:
     def remove_by_coords(self, coords):
         self.remove(self.coords_to_yx[coords])
 
-    def get_data(self, yx):
+    def get_data(self, yx) -> dict:
         try:
             return self.m[yx].data
         except IndexError:
-            return None
+            return dict()
 
-    def get_all_seated(self):
+    def get_all_seated(self) -> list:
         res = list()
         for seat in self.m[np.where(self.m)].tolist():
             res.append(seat.get_placed())
@@ -274,7 +273,7 @@ class Mapping:
                 pass
 
     @property
-    def teams_set(self):
+    def teams_set(self) -> set:
         team_num = set()
         for seat in self.m[np.where(self.m)].tolist():
             if seat.data["team"] != "и":
@@ -282,14 +281,15 @@ class Mapping:
         return team_num
 
     @property
-    def teams_arrived_set(self):
+    def teams_arrived_set(self) -> set:
         team_num_arrived = set()
         for seat in self.m[np.where(self.m)].tolist():
             if seat.data["team"] != "и" and seat.data["arrived"]:
                 team_num_arrived.add(seat.data["team"])
         return team_num_arrived
 
-    def get_mapping_info(self):
+    @property
+    def mapping_info(self) -> dict:
         arrived = 0
         team_members = 0
         team_members_arrived = 0
@@ -317,7 +317,7 @@ class Mapping:
         self.m[self.coords_to_yx[coords]].arrived()
         self.lock(self.coords_to_yx[coords], "arrival")
 
-    def coords_by_email_in_aud(self, email):
+    def coords_by_email_in_aud(self, email) -> dict:
         for person in self.get_all_seated():
             if person["email"] == email:
                 res = {key: value for key, value in person.items() if key in ["aud", "row", "col"]}
@@ -394,15 +394,7 @@ class Auditory(SafeClass):
 
     _required_settings_shape = (9, 4)
 
-    # не реализовано
     def _create_paths(self):
-        """
-        На вход инициализированная карта рассадки,
-        на выходе карта в соответствие с
-        общепринятыми правилам по созданию
-        проходов
-        :return: None
-        """
         self.old_capacity = self.map.capacity
         if self.checker.settings["over_row"] != 1:
             trigger = 1
@@ -426,7 +418,11 @@ class Auditory(SafeClass):
                     trigger = 1
 
     @staticmethod
-    def _get_matrix_condition_places(matrix):
+    def _get_matrix_condition_places(matrix) -> set:
+        """
+        :type matrix: np.matrix
+        :return:
+        """
         center = np.where(matrix == "target")
         close = np.where(matrix == "close")
         y = close[0] - center[0]      # смещение по у
@@ -434,11 +430,11 @@ class Auditory(SafeClass):
         close = set(zip(y, x))
         return close
 
-    def _debug_message(self, test_name, result):
-        end = {True: "Success", False: "Fail"}[result]
-        print("{0: >35} for {1: >10} : {2}".format(test_name, self.outer_name, end))
-
     def _init_settings(self, matrix):
+        """
+        :type matrix: np.matrix
+        :return:
+        """
         # Проверяем наличие ошибок неправильного заполнения таблицы свойств
         if not self._check_shape(fact=matrix.shape,
                                  req=self._required_settings_shape):
@@ -477,7 +473,11 @@ class Auditory(SafeClass):
                 restricted.add(cl)
         self.restricted_klasses = restricted
 
-    def _read_klass(self, matrix):
+    def _read_klass(self, matrix) -> set:
+        """
+        :type matrix: np.matrix
+        :return:
+        """
         klass_condition = matrix
         if not self._check_shape(fact=klass_condition.shape,
                                  req=self._required_klass_shape):
@@ -516,7 +516,11 @@ class Auditory(SafeClass):
         klass_yx = self._get_matrix_condition_places(klass_condition)
         return klass_yx
 
-    def _read_school(self, matrix):
+    def _read_school(self, matrix) -> set:
+        """
+        :type matrix: np.matrix
+        :return:
+        """
         school_condition = matrix
         if not self._check_shape(fact=school_condition.shape,
                                  req=self._required_school_shape):
@@ -550,6 +554,10 @@ class Auditory(SafeClass):
         return school_yx
 
     def _init_seats(self, matrix):
+        """
+        :type matrix: np.matrix
+        :return:
+        """
         # Карта рассадки
         seats_map = matrix
         # Для нее отлько NaN и значения
@@ -571,15 +579,14 @@ class Auditory(SafeClass):
         self._create_paths()
 
     @staticmethod
-    def _eval_map_conditions(school, klass):
+    def _eval_map_conditions(school, klass) -> dict:
         """
         Преобразовывает входные диапазоны в вид,
         подготовленный для единообразной проверки
         *пока что буду считать, что там,
         где проверяется школа, должен проверяться и город
-        :param school: set
-        :param klass: set
-        :return: dict {dyx: (check klass?, check school?)}
+        :type school: set
+        :type klass: set
         """
         klass_school_town = school & klass
         sc_and_town_only = school - klass_school_town
@@ -594,6 +601,11 @@ class Auditory(SafeClass):
         return res
 
     def __init__(self, raw_settings, outer_name):
+        """
+        :param raw_settings: dict
+        :param outer_name: str
+        :return:
+        """
         self.checker = Checker()
         self.team_handler = set()
         self.outer_name = outer_name
@@ -616,6 +628,11 @@ class Auditory(SafeClass):
             raise e
 
     def _rand_loop_insert(self, data, available):
+        """
+        :type data: dict
+        :type available: set
+        :return:
+        """
         if not available:
             raise EndLoopException
         for_check = random.sample(available, 1)[0]
@@ -626,7 +643,12 @@ class Auditory(SafeClass):
         else:
             self._rand_loop_insert(data, available)
 
-    def _scan(self, yx, person):
+    def _scan(self, yx, person) -> bool:
+        """
+        :type yx: (int, int)
+        :type person: dict
+        :return:
+        """
         for dyx, todo in self.klass_school_town_dyx.items():
             coord = (yx[0] + dyx[0], yx[1] + dyx[1])
             if not self.checker.compare(one=person,
@@ -662,8 +684,8 @@ class Auditory(SafeClass):
         return self.inner_name == other.inner_name
 
     @property
-    def info(self):
-        info = self.map.get_mapping_info()
+    def info(self) -> dict:
+        info = self.map.mapping_info
         info["name"] = self.inner_name
         info["old_capacity"] = self.old_capacity
         info["av"] = "+" if self.settings["available"] else "-"
@@ -676,7 +698,7 @@ class Auditory(SafeClass):
         return info
 
     @property
-    def summary(self):
+    def summary(self) -> str:
         message = """
 Аудитрия [{av}] {name}
 Доступность: K[{com}], И[{ind}]
@@ -688,11 +710,15 @@ class Auditory(SafeClass):
         return message
 
     @property
-    def people_table(self):
+    def people_table(self) -> pd.DataFrame:
         table = pd.DataFrame.from_records(self.map.get_all_seated())
         return table
 
     def rand_insert(self, data):
+        """
+        :type data: dict
+        :return:
+        """
         # доступна ли аудитория вообще?
         if not self.settings["available"]:
             raise EndLoopException
@@ -711,6 +737,10 @@ class Auditory(SafeClass):
         self._rand_loop_insert(data=data, available=not_visited)
 
     def rand_insert_team(self, team):
+        """
+        :type team: list
+        :return:
+        """
         if not self.map.capacity > 0:
             raise EndLoopException
         # поместится ли команда?

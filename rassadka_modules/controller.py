@@ -76,7 +76,12 @@ class Controller(SafeClass):
                 else:
                     self.auds[tmp.inner_name] = tmp
 
-    def coords_by_email(self, email):
+    def coords_by_email(self, email) -> dict:
+        """
+        Ищет место, на котором сидит участник с указанным email
+        :param email:
+        :return:
+        """
         for aud in self.auds.values():
             try:
                 result = aud.coords_by_email_in_aud(email)
@@ -85,12 +90,25 @@ class Controller(SafeClass):
                 continue
         raise KeyError(email)
 
-    def seat_by_coords(self, seat):
-        if not isinstance(seat["row"], int) and isinstance(seat["col"], int):
-            raise ValueError("Место/Ряд должны быть числами")
+    def seat_by_coords(self, seat) -> Seat:
+        """
+        Дает непосредственный доступ к объекту места по
+        известным аудитории, ряду, месту
+        Опасно! Некотрые необдуманные игры с этим
+        доступом могут сбить синхронизацию Аудиторией
+        :param seat:
+        :return:
+        """
+        # TODO: круто настроить трансляцию этих действий
         return self.auds[str(seat["aud"])].seat_by_coords((seat["row"], seat["col"]))
 
     def _rand_loop_insert(self, data, available):
+        """
+        Рекурсивная часть
+        :param dict data: чел
+        :param set available: оставшиеся аудитрии на проверку
+        :return:
+        """
         if not available:
             raise NoFreeAuditory
         for_check = random.sample(available, 1)[0]
@@ -101,6 +119,12 @@ class Controller(SafeClass):
             self._rand_loop_insert(data, available)
 
     def _rand_loop_team_insert(self, data, available):
+        """
+        Рекурсивная часть
+        :param dict data:
+        :param set available:
+        :return:
+        """
         if not available:
             raise NoFreeAuditory
         for_check = random.sample(available, 1)[0]
@@ -111,6 +135,11 @@ class Controller(SafeClass):
             self._rand_loop_team_insert(data, available)
 
     def _split_people(self):
+        """
+        Блок разбивает загруженных людей
+        в пачки команд и индивидуалов в
+        соответствии с настройками
+        """
         tmp = pd.DataFrame(self.people.drop(["aud", "row", "col"], errors="ignore", axis=1))
         self.inds = tmp.query("team == 'и'").to_dict(orient="records")
         if not self.checker.settings["com_in_one"]:
@@ -141,6 +170,13 @@ class Controller(SafeClass):
 
     @mutable
     def load_people(self, file):
+        """
+        Требования к входным данным:
+        1) см _required_input_cols
+        2) если с целью получить права editor, то
+           надо дополнительно указать все места
+           Аудитория, Ряд, Место
+        """
         self.inds = list()
         self.teams = list()
         people = pd.read_excel(file, sheetname=0).applymap(clr)
@@ -154,14 +190,14 @@ class Controller(SafeClass):
         if (any([item in people.columns for item in ["aud", "row", "col"]]) and
            not all([item in people.columns for item in ["aud", "row", "col"]])):
             raise ControllerException("Некорректно заданы столбцы с местами")
+        # Присвоение уровня доступа
         if len(people) == 0:
-            self.mode["people"] = "None"
+            self.mode["people"] = "None"            # Нельзя ничего делать с рассаженными участниками
             return
         elif "aud" in people.columns:
-            self.mode["people"] = "input/edit"
+            self.mode["people"] = "input/edit"      # Можно менять информацию, изымать и добавлять
         else:
-            self.mode["people"] = "input"
-        people["klass"] = people["klass"]
+            self.mode["people"] = "input"           # Можно только добавлять
         self.people = people
         self._split_people()
 
@@ -177,11 +213,35 @@ class Controller(SafeClass):
 
     @mutable
     def clean_seated(self):
+        """
+        Изымает абсолютно всех незаблокированных(!)
+        участников из аудиторий
+        :return:
+        """
         for aud in self.auds.values():
             aud.clean_seated()
 
     @mutable
+    def lock_seated_on_key(self, key: str):
+        """
+        Блокироует участников по ключу.
+        Это позволяет получать определенного
+        рода спокойствие за исполняемые опасные
+        действия над рассаженными участниками
+        :param key: Ключ
+        :return:
+        """
+        for aud in self.auds.values():
+            aud.lock_seated_on_key(key)
+        self.key_holder.add(key)
+
+    @mutable
     def unlock_seated_by_key(self, key):
+        """
+        Разблокировывает участников по ключу
+        :param str key: Ключ
+        :return:
+        """
         if key in self.key_holder:
             for aud in self.auds.values():
                 aud.unlock_seated_by_key(key)
@@ -190,14 +250,29 @@ class Controller(SafeClass):
             raise KeyError(key)
 
     @mutable
-    def lock_seated_on_key(self, key):
-        for aud in self.auds.values():
-            aud.lock_seated_on_key(key)
-        self.key_holder.add(key)
+    def mark_arrival_by_email(self):
+        """
+        Ставит отметку о прибытии для участников, чьи email подгружены
+        """
+        if not bool(self.email_handle):
+            raise ControllerException("Список email-ов пуст")
+        for email in self.email_handle:
+            try:
+                seat = self.coords_by_email(email)
+                self.auds[seat["aud"]].mark_arrival_by_coords((seat["row"], seat["col"]))
+                self.key_holder.add("arrival")
+            except KeyError:
+                continue
 
     @mutable
     def update_seated_by_coords(self, forced=False):
-        if not self.mode["people"] == "input/edit":
+        """
+        Меняет всю информацию на актуальную.
+        Необходимо иметь места, где менять и
+        загруженных людей(что менять)
+        :param bool forced: менять ли людей на местах, которые заблокированы?
+        """
+        if "edit" not in self.mode["people"].split("/"):     # Проверка уровня доступа
             raise ControllerException("PermissionError")
         for new_data in self.people.to_dict(orient="records"):
             for_insert = new_data.copy()
@@ -206,13 +281,23 @@ class Controller(SafeClass):
 
     @mutable
     def remove_seated_by_coords(self):
-        if not self.mode["people"] == "input/edit":
+        """
+        Изымает всех людей по указанным местам.
+        Необходимо иметь места.
+        Не изымает людей с заблокированных мест.
+        """
+        if "edit" not in self.mode["people"].split("/"):     # Проверка уровня доступа
             raise ControllerException("PermissionError")
         for remove_data in self.people.to_dict(orient="records"):
             self.auds[remove_data["aud"]].remove_by_coords((remove_data["row"], remove_data["col"]))
 
     @mutable
     def remove_seated_by_email(self):
+        """
+        Изымает всех людей по указанным email.
+        Необходимо иметь подгруженные email.
+        Не изымает с заблокированных мест.
+        """
         if not bool(self.email_handle):
             raise ControllerException("Список email-ов пуст")
         for email in self.email_handle:
@@ -224,6 +309,10 @@ class Controller(SafeClass):
 
     @mutable
     def clear_buffer(self):
+        """
+        Очистить подгруженных людей и emails.
+        Обнуляет уровень доступа.
+        """
         self.people = pd.DataFrame()
         self.inds = list()
         self.teams = list()
@@ -232,6 +321,11 @@ class Controller(SafeClass):
 
     @mutable
     def place_loaded_people(self):
+        """
+        Рассаживает подгруженных участников
+        """
+        if "input" not in self.mode["people"].split("/"):
+            raise ControllerException("PermissionError")
         if len(self.people) and len(self.seated_people):
             if (set(self.people["email"])) & set(self.seated_people["email"]):
                 message = "{} загруженных участников рассажены!"
@@ -252,7 +346,10 @@ class Controller(SafeClass):
                 raise NoFreeAuditory("{0} итераций были безуспешны, слишком мало аудиторий".format(self.max_iter))
 
     @property
-    def seated_people(self):
+    def seated_people(self) -> pd.DataFrame:
+        """
+        Собирает в общую табличку всех рассаженных участников
+        """
         seated = list()
         for aud in sorted(self.auds.values()):
                 seated.extend(aud.get_all_seated())
@@ -274,6 +371,12 @@ class Controller(SafeClass):
             table.ix[:, Auditory.export_names.keys()].rename(columns=Auditory.export_names).to_excel(writer)
 
     def seated_to_excel(self, file, full=False):
+        """
+        Выводит в эксель инфу по участникам, с их местами и тд
+        :param file: куда выводить
+        :param bool full: всю ли инфу выводить или только на стенд?
+        :return:
+        """
         with pd.ExcelWriter(file) as writer:
             if not full:
                 select = ["fam", "name", "otch", "aud", "row", "col"]
@@ -285,6 +388,11 @@ class Controller(SafeClass):
                                                                                                             index=False)
 
     def maps_with_data_to_excel(self, file, data):
+        """
+        Выводит карту рассадки в эксель с необходимой информацией
+        :param file: куда выводим
+        :param data: какая информация нужна
+        """
         with xlsxwriter.Workbook(file) as workbook:
             form = workbook.add_format()
             form.set_font_size(30)
@@ -296,6 +404,10 @@ class Controller(SafeClass):
                 aud.map_with_data_to_writer(sheet, form, form_2, data)
 
     def maps_with_status_to_excel(self, file):
+        """
+        Выводит карту рассадка с пропечатанными местами в эксель
+        :param file: куда выводим
+        """
         with xlsxwriter.Workbook(file) as workbook:
             form = workbook.add_format()
             form.set_font_size(30)
@@ -307,6 +419,10 @@ class Controller(SafeClass):
                 aud.map_with_status_to_writer(sheet, form, form_2)
 
     def to_pickle(self, file):
+        """
+        Сохраняемся вместе с классовой инфой
+        :param file: куда сохраняемся
+        """
         prepared = dict([("checker_meta", Checker.settings),
                          ("seats_meta", Seat.counters),
                          ("controller", self)])
@@ -330,15 +446,3 @@ class Controller(SafeClass):
         info["people"] = len(self.people)
         info["n_teams"] = len(self.teams)
         return info
-
-    @mutable
-    def mark_arrival_by_email(self):
-        if not bool(self.email_handle):
-            raise ControllerException("Список email-ов пуст")
-        for email in self.email_handle:
-            try:
-                seat = self.coords_by_email(email)
-                self.auds[seat["aud"]].mark_arrival_by_coords((seat["row"], seat["col"]))
-                self.key_holder.add("arrival")
-            except KeyError:
-                continue

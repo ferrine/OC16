@@ -23,6 +23,7 @@ def con_test():
         print("...bad end")
     print("making xlsx file...")
     con.seated_to_excel(open(prefix + "Рассаженные участники.xlsx", "wb"))
+    con.seated_to_excel(open(prefix + "Рассаженные участники full.xlsx", "wb"), full=True)
     print("done")
     print("printing self...")
     print(con.summary_to_string(), file=open(prefix + "whole_sum.txt", "w"))
