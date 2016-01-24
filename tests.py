@@ -16,20 +16,27 @@ def con_test():
     print("got people")
     print("rassadka...")
     try:
-        con.place_them()
+        con.place_loaded_people()
         con.mark_arrival_by_email()
         print("...end")
     except rassadka_exceptions.NoFreeAuditory:
         print("...bad end")
     print("making xlsx file...")
-    con.dump_seated(open(prefix + "Рассаженные участники.xlsx", "wb"))
+    con.seated_to_excel(open(prefix + "Рассаженные участники.xlsx", "wb"))
     print("done")
     print("printing self...")
-    print(con.whole_summary(), file=open(prefix + "whole_sum.txt", "w"))
-    con.write_maps_with_data(open(prefix + "with_klass.xlsx", "wb"), "klass")
-    con.write_maps_with_status(open(prefix + "with_status.xlsx", "wb"))
-    con.xlsx_summary(open(prefix + "Статистика по аудиториям.xlsx", "wb"))
+    print(con.summary_to_string(), file=open(prefix + "whole_sum.txt", "w"))
+    con.maps_with_data_to_excel(open(prefix + "with_klass.xlsx", "wb"), "klass")
+    con.maps_with_status_to_excel(open(prefix + "with_status.xlsx", "wb"))
+    con.summary_to_excel(open(prefix + "Статистика по аудиториям.xlsx", "wb"))
     print(con)
+    print("add П2")
+    con.switch_on_aud("П2")
+    print(con)
+    print("remove П2")
+    con.switch_off_aud("П2")
+    print(con)
+
 
 def update_test():
     con = globals()["c"]
@@ -38,9 +45,9 @@ def update_test():
     con.load_people(open(for_update, "rb"))
     s1 = open(prefix + "update_test_out_1.xlsx", "wb")
     s2 = open(prefix + "update_test_out_2.xlsx", "wb")
-    con.dump_seated(s1)
-    con.update_all(forced=True)
-    con.dump_seated(s2)
+    con.seated_to_excel(s1)
+    con.update_seated_by_coords(forced=True)
+    con.seated_to_excel(s2)
     s1.close()
     s2.close()
 

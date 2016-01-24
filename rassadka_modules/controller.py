@@ -27,13 +27,14 @@ class Controller(SafeClass):
     def __str__(self):
         message = """
 Последнее изменение {last_change}
-Режим {mode}
-Всего аудиторий {n_used_auds}({n_auds})
-Загружено {people:<4} человек, {n_teams} команд
-          {emails:<4} emails
-Всего мест {seats_total: <4}, посажено {seated}({arrived})
-                 команд {seated_teams}({arrived_teams})
-        """.format(**self.info)
+Режим -{mode}-
+Загружено        человек    {people}
+                 команд     {n_teams}
+                 emails     {emails}
+Доступно(всего)  аудиторий  {n_used_auds:<5}({n_auds})
+                 мест       {seats_available:<5}({seats_total})
+Посажено(пришло) человек    {seated:<5}({arrived})
+                 команд     {seated_teams:<5}({arrived_teams})""".format(**self.info)
         return message
 
     def __init__(self, file, from_pickle=False):
@@ -75,10 +76,10 @@ class Controller(SafeClass):
                 else:
                     self.auds[tmp.inner_name] = tmp
 
-    def find_by_email(self, email):
+    def coords_by_email(self, email):
         for aud in self.auds.values():
             try:
-                result = aud.find_by_email(email)
+                result = aud.coords_by_email_in_aud(email)
                 return result
             except KeyError:
                 continue
@@ -105,11 +106,10 @@ class Controller(SafeClass):
         for_check = random.sample(available, 1)[0]
         available.remove(for_check)
         try:
-            for_check.team_rand_insert(data)
+            for_check.rand_insert_team(data)
         except EndLoopException:
             self._rand_loop_team_insert(data, available)
 
-    @mutable
     def _split_people(self):
         tmp = pd.DataFrame(self.people.drop(["aud", "row", "col"], errors="ignore", axis=1))
         self.inds = tmp.query("team == 'и'").to_dict(orient="records")
@@ -121,14 +121,23 @@ class Controller(SafeClass):
                 self.teams.append(tmp.query(query).to_dict(orient="records"))
 
     @mutable
-    def rand_aud_insert(self, data):
-        not_visited = set(self.auds.values())
-        self._rand_loop_insert(data=data, available=not_visited)
+    def switch_on_aud(self, audname):
+        self.auds[audname].switch_on()
 
     @mutable
-    def rand_aud_team_insert(self, data):
-        not_visited = set(self.auds.values())
-        self._rand_loop_team_insert(data=data, available=not_visited)
+    def switch_off_aud(self, audname):
+        self.auds[audname].switch_off()
+
+    @mutable
+    def load_emails(self, file):
+        table = pd.read_excel(file, sheetname=0).applymap(clr)
+        if not self._check_settings(fact=set(table.columns),
+                                    req={"email"},
+                                    way=">="):
+            raise NotEnoughSettings(fact=set(table.columns),
+                                    req={"email"},
+                                    way=">=")
+        self.email_handle = list(table.to_dict()["email"].values())
 
     @mutable
     def load_people(self, file):
@@ -157,27 +166,37 @@ class Controller(SafeClass):
         self._split_people()
 
     @mutable
-    def clean_all(self):
-        for aud in self.auds.values():
-            aud.clean_all()
+    def rand_aud_insert_team(self, data):
+        not_visited = set(self.auds.values())
+        self._rand_loop_team_insert(data=data, available=not_visited)
 
     @mutable
-    def lock_all(self, key):
-        for aud in self.auds.values():
-            aud.lock_all(key)
-        self.key_holder.add(key)
+    def rand_aud_insert(self, data):
+        not_visited = set(self.auds.values())
+        self._rand_loop_insert(data=data, available=not_visited)
 
     @mutable
-    def unlock_all(self, key):
+    def clean_seated(self):
+        for aud in self.auds.values():
+            aud.clean_seated()
+
+    @mutable
+    def unlock_seated_by_key(self, key):
         if key in self.key_holder:
             for aud in self.auds.values():
-                aud.unlock_all(key)
+                aud.unlock_seated_by_key(key)
             self.key_holder.remove(key)
         else:
             raise KeyError(key)
 
     @mutable
-    def update_all(self, forced=False):
+    def lock_seated_on_key(self, key):
+        for aud in self.auds.values():
+            aud.lock_seated_on_key(key)
+        self.key_holder.add(key)
+
+    @mutable
+    def update_seated_by_coords(self, forced=False):
         if not self.mode["people"] == "input/edit":
             raise ControllerException("PermissionError")
         for new_data in self.people.to_dict(orient="records"):
@@ -186,14 +205,25 @@ class Controller(SafeClass):
             self.auds[new_data["aud"]].update_by_coords((new_data["row"], new_data["col"]), for_insert, forced=forced)
 
     @mutable
-    def selected_remove(self):
+    def remove_seated_by_coords(self):
         if not self.mode["people"] == "input/edit":
             raise ControllerException("PermissionError")
         for remove_data in self.people.to_dict(orient="records"):
             self.auds[remove_data["aud"]].remove_by_coords((remove_data["row"], remove_data["col"]))
 
     @mutable
-    def erase_loaded_people(self):
+    def remove_seated_by_email(self):
+        if not bool(self.email_handle):
+            raise ControllerException("Список email-ов пуст")
+        for email in self.email_handle:
+            try:
+                seat = self.coords_by_email(email)
+                self.auds[seat["aud"]].remove_by_coords((seat["row"], seat["col"]))
+            except KeyError:
+                continue
+
+    @mutable
+    def clear_buffer(self):
         self.people = pd.DataFrame()
         self.inds = list()
         self.teams = list()
@@ -201,7 +231,7 @@ class Controller(SafeClass):
         self.mode["people"] = "None"
 
     @mutable
-    def place_them(self):
+    def place_loaded_people(self):
         if len(self.people) and len(self.seated_people):
             if (set(self.people["email"])) & set(self.seated_people["email"]):
                 message = "{} загруженных участников рассажены!"
@@ -210,14 +240,14 @@ class Controller(SafeClass):
         random.seed(self.seed)
         try:
             for team in self.teams:
-                self.rand_aud_team_insert(team)
+                self.rand_aud_insert_team(team)
             for individual in self.inds:
                 self.rand_aud_insert(individual)
         except NoFreeAuditory:
-            self.clean_all()
+            self.clean_seated()
             if self.seed <= self.max_iter:
                 self.seed += 1
-                self.place_them()
+                self.place_loaded_people()
             else:
                 raise NoFreeAuditory("{0} итераций были безуспешны, слишком мало аудиторий".format(self.max_iter))
 
@@ -229,13 +259,13 @@ class Controller(SafeClass):
         frame = pd.DataFrame.from_dict(seated)
         return frame
 
-    def whole_summary(self):
+    def summary_to_string(self):
         message = ""
         for aud in sorted(self.auds.values()):
-            message += aud.summary() + "\n"
+            message += aud.summary + "\n"
         return message
 
-    def xlsx_summary(self, file):
+    def summary_to_excel(self, file):
         with pd.ExcelWriter(file) as writer:
             summary = list()
             for aud in self.auds.values():
@@ -243,7 +273,7 @@ class Controller(SafeClass):
             table = pd.DataFrame.from_records(summary, index="name")
             table.ix[:, Auditory.export_names.keys()].rename(columns=Auditory.export_names).to_excel(writer)
 
-    def dump_seated(self, file, full=False):
+    def seated_to_excel(self, file, full=False):
         with pd.ExcelWriter(file) as writer:
             if not full:
                 select = ["fam", "name", "otch", "aud", "row", "col"]
@@ -254,7 +284,7 @@ class Controller(SafeClass):
                                                                           self._default_full_dict).to_excel(writer,
                                                                                                             index=False)
 
-    def write_maps_with_data(self, file, data):
+    def maps_with_data_to_excel(self, file, data):
         with xlsxwriter.Workbook(file) as workbook:
             form = workbook.add_format()
             form.set_font_size(30)
@@ -265,7 +295,7 @@ class Controller(SafeClass):
                 sheet = workbook.add_worksheet(aud.inner_name)
                 aud.map_with_data_to_writer(sheet, form, form_2, data)
 
-    def write_maps_with_status(self, file):
+    def maps_with_status_to_excel(self, file):
         with xlsxwriter.Workbook(file) as workbook:
             form = workbook.add_format()
             form.set_font_size(30)
@@ -289,43 +319,26 @@ class Controller(SafeClass):
         info["n_auds"] = len(self.auds)
         info["n_used_auds"] = sum([aud.settings["available"] for aud in self.auds.values()])
         info["seated_teams"] = len(reduce(lambda x, y: x.union(y), [aud.teams_set for aud in self.auds.values()]))
-        info["arrived_teams"] = len(reduce(lambda x, y: x.union(y), [aud.teams_arrived_set for aud in self.auds.values()]))
-        info["seated"] = Seat.counters["seated"]
-        info["seats_total"] = Seat.counters["total"]
-        info["arrived"] = Seat.counters["arrived"]
+        info["arrived_teams"] = len(reduce(lambda x, y: x.union(y),
+                                           [aud.teams_arrived_set for aud in self.auds.values()]))
+        info["seats_available"] = Seat.total_seats()
+        info["seated"] = Seat.total_seated()
+        info["seats_total"] = sum([aud.capacity for aud in self.auds.values()])
+        info["arrived"] = Seat.total_arrived()
         info["mode"] = self.mode["people"]
         info["emails"] = len(self.email_handle)
         info["people"] = len(self.people)
         info["n_teams"] = len(self.teams)
         return info
 
-    def load_emails(self, file):
-        table = pd.read_excel(file, sheetname=0).applymap(clr)
-        if not self._check_settings(fact=set(table.columns),
-                                    req={"email"},
-                                    way=">="):
-            raise NotEnoughSettings(fact=set(table.columns),
-                                    req={"email"},
-                                    way=">=")
-        self.email_handle = list(table.to_dict()["email"].values())
-
+    @mutable
     def mark_arrival_by_email(self):
         if not bool(self.email_handle):
             raise ControllerException("Список email-ов пуст")
         for email in self.email_handle:
             try:
-                seat = self.find_by_email(email)
+                seat = self.coords_by_email(email)
                 self.auds[seat["aud"]].mark_arrival_by_coords((seat["row"], seat["col"]))
                 self.key_holder.add("arrival")
-            except KeyError:
-                continue
-    
-    def remove_by_email(self):
-        if not bool(self.email_handle):
-            raise ControllerException("Список email-ов пуст")
-        for email in self.email_handle:
-            try:
-                seat = self.find_by_email(email)
-                self.auds[seat["aud"]].remove_by_coords((seat["row"], seat["col"]))
             except KeyError:
                 continue

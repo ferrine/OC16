@@ -23,15 +23,18 @@ class Seat:
         self.yx = yx
         self.status = bool(status)
         self.data = data if data else dict()
-        if status:
-            self._plus_total()
 
-    def see_total(self):
-        return self.counters["total"]
+    def __bool__(self):             # Тут кто-то сидит?
+        return bool(self.data)
 
-    @classmethod
-    def count_seated(cls):
-        return cls.counters["seated"]
+    def __str__(self):
+        return "Ряд {0}; Место {1}".format(*self.yx)
+
+    def __repr__(self):
+        res = ";"
+        if self.data:
+            res = str(self.data["klass"]) + ";"
+        return res
 
     @classmethod
     def _plus_total(cls):
@@ -42,11 +45,11 @@ class Seat:
         cls.counters["total"] -= 1
 
     @classmethod
-    def _plus(cls):
+    def _plus_seated(cls):
         cls.counters["seated"] += 1
 
     @classmethod
-    def _minus(cls):
+    def _minus_seated(cls):
         cls.counters["seated"] -= 1
 
     @classmethod
@@ -56,6 +59,18 @@ class Seat:
     @classmethod
     def _minus_arrived(cls):
         cls.counters["arrived"] -= 1
+
+    @classmethod
+    def total_seated(cls):
+        return cls.counters["seated"]
+
+    @classmethod
+    def total_seats(cls):
+        return cls.counters["total"]
+
+    @classmethod
+    def total_arrived(cls):
+        return cls.counters["arrived"]
 
     def switch_on(self):
         if not self.status:
@@ -78,7 +93,7 @@ class Seat:
             raise BadSeat("Место не пусто!")
         self.data = person
         self.data["arrived"] = False
-        self._plus()
+        self._plus_seated()
 
     def remove(self):
         if self.locked:
@@ -87,27 +102,8 @@ class Seat:
             raise BadSeat("Место не задействовано!")
         if not self.data:
             raise BadSeat("Место уже пусто!")
-        self._minus()
+        self._minus_seated()
         self.data = dict()
-
-    def __bool__(self):             # Тут кто-то сидит?
-        return bool(self.data)
-
-    def __str__(self):
-        return "Ряд {0}; Место {1}".format(*self.yx)
-
-    def __repr__(self):
-        res = ";"
-        if self.data:
-            res = str(self.data["klass"]) + ";"
-        return res
-
-    def get_placed(self):
-        if self.data:
-            res = self.data.copy()
-            res["aud"] = self.aud
-            res["row"], res["col"] = self.yx
-            return res
 
     def lock(self, key):
         if self.data and not self.locked:
@@ -118,6 +114,20 @@ class Seat:
         if self.locked and key == self.lock_key:
             self.locked = False
             self.lock_key = None
+
+    def arrived(self):
+        if not self:
+            raise PermissionError
+        if not self.data["arrived"] == True:
+            self.data["arrived"] = True
+            self._plus_arrived()
+
+    def arrived_del(self):
+        if not self:
+            raise PermissionError
+        if self.data["arrived"]:
+            self.data["arrived"] = False
+            self._minus_arrived()
 
     def update(self, new_data, forced):
         if not self.status:
@@ -132,23 +142,16 @@ class Seat:
         if "arrived" not in self.data.keys:
             self.data["arrived"] = False
 
-    def arrived_del(self):
-        if not self:
-            raise PermissionError
-        if self.data["arrived"]:
-            self.data["arrived"] = False
-            self._minus_arrived()
-
-    def arrived(self):
-        if not self:
-            raise PermissionError
-        if not self.data["arrived"] == True:
-            self.data["arrived"] = True
-            self._plus_arrived()
+    def get_placed(self):
+        if self.data:
+            res = self.data.copy()
+            res["aud"] = self.aud
+            res["row"], res["col"] = self.yx
+            return res
 
 
 class Mapping:
-    def __getitem__(self, item):
+    def __getitem__(self, item) -> Seat:
         try:
             return self.m[item]
         except IndexError:
@@ -201,7 +204,7 @@ class Mapping:
         self.counter -= 1
         self.available_seats.add(yx)
 
-    def switch_off(self, yx):
+    def switch_off_by_yx(self, yx):
         try:
             self.m[yx].switch_off()
             self._minus_capacity(yx)
@@ -314,7 +317,7 @@ class Mapping:
         self.m[self.coords_to_yx[coords]].arrived()
         self.lock(self.coords_to_yx[coords], "arrival")
 
-    def find_by_email(self, email):
+    def coords_by_email_in_aud(self, email):
         for person in self.get_all_seated():
             if person["email"] == email:
                 res = {key: value for key, value in person.items() if key in ["aud", "row", "col"]}
@@ -400,24 +403,24 @@ class Auditory(SafeClass):
         проходов
         :return: None
         """
-        self.old_capacity = self.capacity
+        self.old_capacity = self.map.capacity
         if self.checker.settings["over_row"] != 1:
             trigger = 1
-            for row in range(self._seats_map.shape[0]):
-                if any([seat.status for seat in self._seats_map[row, :]]):
+            for row in range(self.map.shape[0]):
+                if any([seat.status for seat in self.map[row, :]]):
                     if trigger % self.checker.settings["over_row"] == 0:
-                        for seat in range(self._seats_map.shape[1]):
-                            self._seats_map.switch_off((row, seat))
+                        for seat in range(self.map.shape[1]):
+                            self.map.switch_off_by_yx((row, seat))
                     trigger += 1
                 else:
                     trigger = 1
         if self.checker.settings["over_place"] != 1:
             trigger = 1
-            for seat in range(self._seats_map.shape[1]):
-                if any([seat.status for seat in self._seats_map[:, seat]]):
+            for seat in range(self.map.shape[1]):
+                if any([seat.status for seat in self.map[:, seat]]):
                     if trigger % self.checker.settings["over_place"] == 0:
-                        for row in range(self._seats_map.shape[0]):
-                            self._seats_map.switch_off((row, seat))
+                        for row in range(self.map.shape[0]):
+                            self.map.switch_off_by_yx((row, seat))
                     trigger += 1
                 else:
                     trigger = 1
@@ -564,7 +567,7 @@ class Auditory(SafeClass):
                                     aud=self.outer_name)
         seats_map[seats_map == self._required_seats_values["seat"]] = True
         seats_map[seats_map == self._required_seats_values["not_allowed"]] = False
-        self._seats_map = Mapping(seats_map, str(self.settings["name"]))
+        self.map = Mapping(seats_map, str(self.settings["name"]))
         self._create_paths()
 
     @staticmethod
@@ -605,85 +608,40 @@ class Auditory(SafeClass):
             klass_yx = self._read_klass(raw_settings["klass"])
             school_yx = self._read_school(raw_settings["school"])
             self._init_seats(raw_settings["seats"])
+            if self.settings["available"]:
+                Seat.counters["total"] += self.capacity
             self.klass_school_town_dyx = self._eval_map_conditions(school=school_yx, klass=klass_yx)
         except UserErrorException as e:
             e.log_error()
             raise e
-
-    def __str__(self):
-        res = """
-            settings:
-{0}
-
-            seats_shape: {1}
-
-           klass_school_town
-{2}
-------------Checker:------------
-{3}
-""".format(self.settings, self.shape,
-           self.klass_school_town_dyx,
-           self.checker)
-        return res
-
-    def scan(self, yx, person):
-        for dyx, todo in self.klass_school_town_dyx.items():
-            coord = (yx[0] + dyx[0], yx[1] + dyx[1])
-            if not self.checker.compare(one=person,
-                                        two=self.get_data(coord),
-                                        task=todo):
-                return False
-        return True
-
-    def __getattr__(self, item):
-        where = object.__getattribute__(self, "_seats_map")
-        return getattr(where, item)
 
     def _rand_loop_insert(self, data, available):
         if not available:
             raise EndLoopException
         for_check = random.sample(available, 1)[0]
         available.remove(for_check)
-        if self.scan(for_check, data):
-            self.insert(for_check, data)
+        if self._scan(for_check, data):
+            self.map.insert(for_check, data)
             self.team_handler.add(for_check)
         else:
             self._rand_loop_insert(data, available)
 
-    def rand_insert(self, data):
-        # доступна ли аудитория вообще?
-        if not self.settings["available"]:
-            raise EndLoopException
-        # Проверка, можно ли сажать данного участника
-        # Критерий "командный/индивидуальный"
-        if data["team"] == "и":
-            if not self.settings["individual"]:
-                raise EndLoopException
-        else:
-            if not self.settings["command"]:
-                raise EndLoopException
-        # Критерий по классу
-        if data["klass"] in self.restricted_klasses:
-            raise EndLoopException
-        not_visited = self.available_seats.copy()
-        self._rand_loop_insert(data=data, available=not_visited)
+    def _scan(self, yx, person):
+        for dyx, todo in self.klass_school_town_dyx.items():
+            coord = (yx[0] + dyx[0], yx[1] + dyx[1])
+            if not self.checker.compare(one=person,
+                                        two=self.map.get_data(coord),
+                                        task=todo):
+                return False
+        return True
 
-    def team_rand_insert(self, team):
-        if not self.capacity > 0:
-            raise EndLoopException
-        # поместится ли команда?
-        if self.checker.settings["max_compart"] < (self.counter + len(team)) / self.capacity:
-            raise EndLoopException
-        # Дальнейшик проверки для простоты находятся во вспомогательной функции
-        self.team_handler = set()
-        try:
-            for member in team:
-                self.rand_insert(member)
-        except EndLoopException:
-            for ups in self.team_handler:
-                self.remove(ups)
-            # Для конроллера необходимо словить исключение в этом случае
-            raise EndLoopException
+    def __getattr__(self, item):
+        where = object.__getattribute__(self, "map")
+        return getattr(where, item)
+
+    def __repr__(self):
+        res = "<{name}[{av}]:{capacity}({total})>".format(**self.info)
+        return res
 
     def __hash__(self):
         return hash(self.inner_name)
@@ -705,7 +663,7 @@ class Auditory(SafeClass):
 
     @property
     def info(self):
-        info = self.get_mapping_info()
+        info = self.map.get_mapping_info()
         info["name"] = self.inner_name
         info["old_capacity"] = self.old_capacity
         info["av"] = "+" if self.settings["available"] else "-"
@@ -717,6 +675,7 @@ class Auditory(SafeClass):
         info["kl11"] = "+" if self.settings["class_11"] else "-"
         return info
 
+    @property
     def summary(self):
         message = """
 Аудитрия [{av}] {name}
@@ -728,24 +687,60 @@ class Auditory(SafeClass):
 """.format(**self.info)
         return message
 
-    def __repr__(self):
-        mes = "<{0}: cap={1}>"
-        return mes.format(self.inner_name, self.capacity)
+    @property
+    def people_table(self):
+        table = pd.DataFrame.from_records(self.map.get_all_seated())
+        return table
+
+    def rand_insert(self, data):
+        # доступна ли аудитория вообще?
+        if not self.settings["available"]:
+            raise EndLoopException
+        # Проверка, можно ли сажать данного участника
+        # Критерий "командный/индивидуальный"
+        if data["team"] == "и":
+            if not self.settings["individual"]:
+                raise EndLoopException
+        else:
+            if not self.settings["command"]:
+                raise EndLoopException
+        # Критерий по классу
+        if data["klass"] in self.restricted_klasses:
+            raise EndLoopException
+        not_visited = self.map.available_seats.copy()
+        self._rand_loop_insert(data=data, available=not_visited)
+
+    def rand_insert_team(self, team):
+        if not self.map.capacity > 0:
+            raise EndLoopException
+        # поместится ли команда?
+        if self.checker.settings["max_compart"] < (self.map.counter + len(team)) / self.map.capacity:
+            raise EndLoopException
+        # Дальнейшик проверки для простоты находятся во вспомогательной функции
+        self.team_handler = set()
+        try:
+            for member in team:
+                self.rand_insert(member)
+        except EndLoopException:
+            for ups in self.team_handler:
+                self.map.remove(ups)
+            # Для конроллера необходимо словить исключение в этом случае
+            raise EndLoopException
 
     def map_with_data_to_writer(self, writer, name_format, seats_format, data):
         dy = 1
         dx = 0
         writer.write(0, 0, self.inner_name, name_format)
         writer.write(0 + dy, 0 + dx, "Абсолютные")
-        for y in range(self.shape[0]):
+        for y in range(self.map.shape[0]):
             writer.write(y + 1 + dy, 0 + dx, "ряд " + str(y + 1))
-        for x in range(self.shape[1]):
+        for x in range(self.map.shape[1]):
             writer.write(0 + dy, x + 1 + dx, "место " + str(x + 1))
-        for y, x in product(range(self.shape[0]), range(self.shape[1])):
-            person = self.get_data((y, x))
-            if self.m[(y, x)]:
+        for y, x in product(range(self.map.shape[0]), range(self.map.shape[1])):
+            person = self.map.get_data((y, x))
+            if self.map.m[(y, x)]:
                 task = person[data]
-            elif self.m[(y, x)].status:
+            elif self.map.m[(y, x)].status:
                 task = "..."
             else:
                 task = "______"
@@ -756,19 +751,25 @@ class Auditory(SafeClass):
         dx = 0
         writer.write(0, 0, self.inner_name, name_format)
         writer.write(0 + dy, 0 + dx, "Абсолютные")
-        for y in range(self.shape[0]):
+        for y in range(self.map.shape[0]):
             writer.write(y + 1 + dy, 0 + dx, "ряд " + str(y + 1))
-        for x in range(self.shape[1]):
+        for x in range(self.map.shape[1]):
             writer.write(0 + dy, x + 1 + dx, "место " + str(x + 1))
-        for y, x in product(range(self.shape[0]), range(self.shape[1])):
+        for y, x in product(range(self.map.shape[0]), range(self.map.shape[1])):
             task = "______"
-            if self._seats_map[y, x].status:
-                task = str(self._seats_map[y, x].yx)
+            if self.map[y, x].status:
+                task = str(self.map[y, x].yx)
             writer.write(y + 1 + dy, x + 1 + dx, task, seats_format)
 
-    def people_table(self):
-        table = pd.DataFrame.from_records(self.get_all_seated())
-        return table
+    def switch_on(self):
+        if self.settings["available"] != 1:
+            self.settings["available"] = 1
+            Seat.counters["total"] += self.capacity
+
+    def switch_off(self):
+        if self.settings["available"] != 0:
+            self.settings["available"] = 0
+            Seat.counters["total"] -= self.capacity
 
 if __name__ == "__main__":
     pass

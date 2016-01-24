@@ -13,8 +13,8 @@ if __name__ == "__main__":
         print(con.seat_by_coords(con.seated_people.iloc[0].to_dict()).data["fam"],
               con.seat_by_coords(con.seated_people.iloc[0].to_dict()).aud,
               con.seat_by_coords(con.seated_people.iloc[0].to_dict()))
-        print(con.find_by_email("sacha_pltnicov@mail.ru"))
-        print(con.find_by_email("strange_email"))
+        print(con.coords_by_email("sacha_pltnicov@mail.ru"))
+        print(con.coords_by_email("strange_email"))
         sys.exit(0)
     main()
     con_test()
