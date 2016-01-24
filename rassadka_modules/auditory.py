@@ -227,9 +227,6 @@ class Mapping:
     def unlock(self, yx, key):
         self.m[yx].unlock(key)
 
-    def seat_by_coords(self, coords) -> Seat:
-        return self.m[self.coords_to_yx[coords]]
-
     def update_by_coords(self, coords, new_data, forced=False):
         if self.m[self.coords_to_yx[coords]]:
             self.update(self.coords_to_yx[coords], new_data, forced)
@@ -757,15 +754,12 @@ class Auditory(SafeClass):
             # Для конроллера необходимо словить исключение в этом случае
             raise EndLoopException
 
-    def map_with_data_to_writer(self, writer, name_format, seats_format, data):
-        dy = 1
-        dx = 0
-        writer.write(0, 0, self.inner_name, name_format)
-        writer.write(0 + dy, 0 + dx, "Абсолютные")
+    def map_with_data_to_writer(self, writer, seats_format, data):
+        writer.write(0, 0, "Абс.")
         for y in range(self.map.shape[0]):
-            writer.write(y + 1 + dy, 0 + dx, "ряд " + str(y + 1))
+            writer.write(y + 1, 0, "ряд " + str(y + 1))
         for x in range(self.map.shape[1]):
-            writer.write(0 + dy, x + 1 + dx, "место " + str(x + 1))
+            writer.write(0, x + 1, "мст " + str(x + 1))
         for y, x in product(range(self.map.shape[0]), range(self.map.shape[1])):
             person = self.map.get_data((y, x))
             if self.map.m[(y, x)]:
@@ -774,22 +768,19 @@ class Auditory(SafeClass):
                 task = "..."
             else:
                 task = "______"
-            writer.write(y + 1 + dy, x + 1 + dx, task, seats_format)
+            writer.write(y + 1, x + 1, task, seats_format)
 
-    def map_with_status_to_writer(self, writer, name_format, seats_format):
-        dy = 1
-        dx = 0
-        writer.write(0, 0, self.inner_name, name_format)
-        writer.write(0 + dy, 0 + dx, "Абсолютные")
+    def map_with_status_to_writer(self, writer, seats_format):
+        writer.write(0, 0, "Абс.")
         for y in range(self.map.shape[0]):
-            writer.write(y + 1 + dy, 0 + dx, "ряд " + str(y + 1))
+            writer.write(y + 1, 0, "ряд " + str(y + 1))
         for x in range(self.map.shape[1]):
-            writer.write(0 + dy, x + 1 + dx, "место " + str(x + 1))
+            writer.write(0, x + 1, "мст " + str(x + 1))
         for y, x in product(range(self.map.shape[0]), range(self.map.shape[1])):
             task = "______"
             if self.map[y, x].status:
                 task = str(self.map[y, x].yx)
-            writer.write(y + 1 + dy, x + 1 + dx, task, seats_format)
+            writer.write(y + 1, x + 1, task, seats_format)
 
     def switch_on(self):
         if self.settings["available"] != 1:

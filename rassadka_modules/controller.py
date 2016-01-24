@@ -20,8 +20,10 @@ class Controller(SafeClass):
                                  ("town", "Город"), ("school", "Школа"), ("team", "Команда"),
                                  ("klass", "Класс")])
     _default_full_dict = _required_input_cols.copy()
-    _default_full_dict.update([("aud", "Аудитория"), ("row", "Ряд"),
+    _default_full_dict.update([("aud", "Ауд."), ("row", "Ряд"),
                                ("col", "Место"), ("arrived", "Отметка о прибытии")])
+    _mini_out = ["fam", "name", "otch", "aud", "row", "col"]
+    _razdatka_cols = ["fam", "name", "otch", "row", "col", "Пришел?"]
     max_iter = 20
 
     def __str__(self):
@@ -89,18 +91,6 @@ class Controller(SafeClass):
             except KeyError:
                 continue
         raise KeyError(email)
-
-    def seat_by_coords(self, seat) -> Seat:
-        """
-        Дает непосредственный доступ к объекту места по
-        известным аудитории, ряду, месту
-        Опасно! Некотрые необдуманные игры с этим
-        доступом могут сбить синхронизацию Аудиторией
-        :param seat:
-        :return:
-        """
-        # TODO: круто настроить трансляцию этих действий
-        return self.auds[str(seat["aud"])].seat_by_coords((seat["row"], seat["col"]))
 
     def _rand_loop_insert(self, data, available):
         """
@@ -379,13 +369,17 @@ class Controller(SafeClass):
         """
         with pd.ExcelWriter(file) as writer:
             if not full:
-                select = ["fam", "name", "otch", "aud", "row", "col"]
+                select = self._mini_out
             else:
                 select = list(self._default_full_dict.keys())
             frame = self.seated_people
-            frame.ix[:, select].sort_values("fam", ascending=True).rename(columns=
-                                                                          self._default_full_dict).to_excel(writer,
-                                                                                                            index=False)
+            frame.ix[:, select].sort_values("fam", ascending=True).rename(
+                    columns=self._default_full_dict).reset_index(drop=True).to_excel(writer, "На стенд")
+            sheet = writer.sheets["На стенд"]
+            sheet.set_column("B:D", 15)
+            sheet.repeat_rows(0)
+            sheet.hide_gridlines(0)
+            sheet.set_paper(9)
 
     def maps_with_data_to_excel(self, file, data):
         """
@@ -395,13 +389,22 @@ class Controller(SafeClass):
         """
         with xlsxwriter.Workbook(file) as workbook:
             form = workbook.add_format()
-            form.set_font_size(30)
+            form.set_align('center')
             form.set_bold()
-            form_2 = workbook.add_format()
-            form_2.set_align('center')
             for aud in self.auds.values():
                 sheet = workbook.add_worksheet(aud.inner_name)
-                aud.map_with_data_to_writer(sheet, form, form_2, data)
+                aud.map_with_data_to_writer(sheet, form, data)
+                sheet.set_header("&L&30 " + aud.inner_name)
+                sheet.set_column(0, aud.shape[1], 6.5)
+                sheet.hide_gridlines(0)
+                if aud.inner_name.startswith("П"):
+                    sheet.set_paper(8)
+                    sheet.set_print_scale(75)
+                else:
+                    sheet.set_paper(9)
+                sheet.set_landscape()
+                sheet.fit_to_pages(1, 1)
+                sheet.set_page_view()
 
     def maps_with_status_to_excel(self, file):
         """
@@ -410,13 +413,41 @@ class Controller(SafeClass):
         """
         with xlsxwriter.Workbook(file) as workbook:
             form = workbook.add_format()
-            form.set_font_size(30)
+            form.set_align('center')
             form.set_bold()
-            form_2 = workbook.add_format()
-            form_2.set_align('center')
             for aud in self.auds.values():
                 sheet = workbook.add_worksheet(aud.inner_name)
-                aud.map_with_status_to_writer(sheet, form, form_2)
+                aud.map_with_status_to_writer(sheet, form)
+                sheet.set_header("&L&30 " + aud.inner_name)
+                sheet.hide_gridlines(0)
+                sheet.set_column(0, aud.shape[1], 6.5)
+                if aud.inner_name.startswith("П"):
+                    sheet.set_paper(8)
+                    sheet.set_print_scale(75)
+                else:
+                    sheet.set_paper(9)
+                sheet.set_landscape()
+                sheet.fit_to_pages(1, 1)
+                sheet.set_page_view()
+
+    def razdatka_to_excel(self, file):
+        """
+        Выводит списки с участниками в каждой аудитории в ексель
+        :param file: куда выводим
+        :return:
+        """
+        with pd.ExcelWriter(file) as writer:
+            for aud in self.auds.values():
+                aud.people_table.ix[:, self._razdatka_cols].sort_values("fam", ascending=True).rename(
+                        columns=self._default_full_dict).to_excel(
+                        writer, aud.inner_name, index=False)
+                sheet = writer.sheets[aud.inner_name]
+                sheet.set_column("A:C", 15)
+                sheet.repeat_rows(0)
+                sheet.hide_gridlines(0)
+                sheet.set_paper(9)
+                sheet.set_header("&L&30 " + aud.inner_name)
+                sheet.set_page_view()
 
     def to_pickle(self, file):
         """
@@ -446,3 +477,4 @@ class Controller(SafeClass):
         info["people"] = len(self.people)
         info["n_teams"] = len(self.teams)
         return info
+
