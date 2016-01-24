@@ -13,7 +13,8 @@ from collections import OrderedDict as oDict
 
 class Seat:
     counters = dict([("seated", 0),
-                     ("total", 0)])
+                     ("total", 0),
+                     ("arrived", 0)])
 
     def __init__(self, yx, status, data=None, audname=None):
         self.locked = False
@@ -21,7 +22,7 @@ class Seat:
         self.aud = audname
         self.yx = yx
         self.status = bool(status)
-        self.data = data
+        self.data = data if data else dict()
         if status:
             self._plus_total()
 
@@ -48,6 +49,14 @@ class Seat:
     def _minus(cls):
         cls.counters["seated"] -= 1
 
+    @classmethod
+    def _plus_arrived(cls):
+        cls.counters["arrived"] += 1
+
+    @classmethod
+    def _minus_arrived(cls):
+        cls.counters["arrived"] -= 1
+
     def switch_on(self):
         if not self.status:
             self.status = True
@@ -56,7 +65,7 @@ class Seat:
             raise PermissionError
 
     def switch_off(self):
-        if self.status and self.data is None:
+        if self.status and not self.data:
             self.status = False
             self._minus_total()
         else:
@@ -65,9 +74,10 @@ class Seat:
     def insert(self, person):
         if not self.status:
             raise BadSeat("Место не задействовано!")
-        if self.data is not None:
+        if self.data:
             raise BadSeat("Место не пусто!")
         self.data = person
+        self.data["arrived"] = False
         self._plus()
 
     def remove(self):
@@ -75,13 +85,13 @@ class Seat:
             raise BadSeat("Место заблокировано!")
         if not self.status:
             raise BadSeat("Место не задействовано!")
-        if self.data is None:
+        if not self.data:
             raise BadSeat("Место уже пусто!")
         self._minus()
-        self.data = None
+        self.data = dict()
 
     def __bool__(self):             # Тут кто-то сидит?
-        return self.data is not None
+        return bool(self.data)
 
     def __str__(self):
         return "Ряд {0}; Место {1}".format(*self.yx)
@@ -114,10 +124,36 @@ class Seat:
             raise ControllerException("Permission to {0} {1} {2} denied".format(self.aud, *self.yx))
         if self.locked and not forced:
             raise ControllerException("Permission to {0} {1} {2} denied".format(self.aud, *self.yx))
+        if new_data.get("arrived", False) and not self.data.get("arrived", False):
+            self._plus_arrived()
+        elif not new_data.get("arrived", False) and self.data.get("arrived", False):
+            self._minus_arrived()
         self.data = new_data
+        if "arrived" not in self.data.keys:
+            self.data["arrived"] = False
+
+    def arrived_del(self):
+        if not self:
+            raise PermissionError
+        if self.data["arrived"]:
+            self.data["arrived"] = False
+            self._minus_arrived()
+
+    def arrived(self):
+        if not self:
+            raise PermissionError
+        if not self.data["arrived"] == True:
+            self.data["arrived"] = True
+            self._plus_arrived()
 
 
 class Mapping:
+    def __getitem__(self, item):
+        try:
+            return self.m[item]
+        except IndexError:
+            return None
+
     def __getattr__(self, item):
         where = object.__getattribute__(self, "m")
         return getattr(where, item)
@@ -146,6 +182,9 @@ class Mapping:
                     max_col = max(max_col, x)
         self.m = res[:max_row + 1, :max_col + 1]
 
+    def __str__(self):
+        return str(self.m)
+
     def _plus_capacity(self, yx):
         self.available_seats.add(yx)
         self.capacity += 1
@@ -169,9 +208,6 @@ class Mapping:
         except PermissionError:
             pass
 
-    def __str__(self):
-        return str(self.m)
-
     def insert(self, yx, data):
         self.m[yx].insert(data)
         self._plus(yx)
@@ -189,24 +225,21 @@ class Mapping:
     def unlock(self, yx, key):
         self.m[yx].unlock(key)
 
-    def update_by_position(self, coords, new_data, forced=False):
+    def seat_by_coords(self, coords):
+        return self.m[self.coords_to_yx[coords]]
+
+    def update_by_coords(self, coords, new_data, forced=False):
         if self.m[self.coords_to_yx[coords]]:
             self.update(self.coords_to_yx[coords], new_data, forced)
         else:
             self.insert(self.coords_to_yx[coords], new_data)
 
-    def remove_by_position(self, coords):
+    def remove_by_coords(self, coords):
         self.remove(self.coords_to_yx[coords])
 
     def get_data(self, yx):
         try:
             return self.m[yx].data
-        except IndexError:
-            return None
-
-    def __getitem__(self, item):
-        try:
-            return self.m[item]
         except IndexError:
             return None
 
@@ -237,20 +270,56 @@ class Mapping:
             except BadSeat:
                 pass
 
-    def get_mapping_info(self):
-        team_members = 0
+    @property
+    def teams_set(self):
         team_num = set()
-        klass_count = dict([("n8", 0), ("n9", 0), ("n10", 0), ("n11", 0)])
+        for seat in self.m[np.where(self.m)].tolist():
+            if seat.data["team"] != "и":
+                team_num.add(seat.data["team"])
+        return team_num
+
+    @property
+    def teams_arrived_set(self):
+        team_num_arrived = set()
+        for seat in self.m[np.where(self.m)].tolist():
+            if seat.data["team"] != "и" and seat.data["arrived"]:
+                team_num_arrived.add(seat.data["team"])
+        return team_num_arrived
+
+    def get_mapping_info(self):
+        arrived = 0
+        team_members = 0
+        team_members_arrived = 0
+        klass_count = dict([("n8", 0), ("n9", 0), ("n10", 0), ("n11", 0),
+                            ("n8_a", 0), ("n9_a", 0), ("n10_a", 0), ("n11_a", 0)])
         for seat in self.m[np.where(self.m)].tolist():
             klass_count["n" + str(seat.data["klass"])] += 1
+            if seat.data["arrived"]:
+                klass_count["n" + str(seat.data["klass"]) + "_a"] += 1
+                arrived += 1
+                if seat.data["team"] != "и":
+                    team_members_arrived += 1
             if seat.data["team"] != "и":
                 team_members += 1
-                team_num.add(seat.data["team"])
         res = dict([("team_members", team_members),
-                    ("teams", len(team_num)),
+                    ("teams", len(self.teams_set)),
                     ("total", self.counter),
-                    ("capacity", self.capacity)], **klass_count)
+                    ("capacity", self.capacity),
+                    ("arrived", arrived),
+                    ("team_members_arrived", team_members_arrived),
+                    ("teams_arrived", len(self.teams_arrived_set))], **klass_count)
         return res
+
+    def mark_arrival_by_coords(self, coords):
+        self.m[self.coords_to_yx[coords]].arrived()
+        self.lock(self.coords_to_yx[coords], "arrival")
+
+    def find_by_email(self, email):
+        for person in self.get_all_seated():
+            if person["email"] == email:
+                res = {key: value for key, value in person.items() if key in ["aud", "row", "col"]}
+                return res
+        raise KeyError
 
 
 class Auditory(SafeClass):
@@ -276,9 +345,13 @@ class Auditory(SafeClass):
     и относительной для вывода на печать рассадки
     """
     export_names = oDict([("old_capacity", "Вместительность"), ("capacity", "Вместительность с доп проходами"),
-                          ("total", "Всего сидит"), ("teams", "Всего команд"),
-                          ("team_members", "Всего командных участников"),
-                          ("n8", "8кл"), ("n9", "9кл"), ("n10", "10кл"), ("n11", "11кл")])
+                          ("total", "Сидит"), ("arrived", "Сидит(+)"),
+                          ("teams", "Команд"), ("teams_arrived", "Команд(+)"),
+                          ("team_members", "Командников"), ("team_members_arrived", "Командников(+)"),
+                          ("n8", "8кл"), ("n8_a", "8кл(+)"),
+                          ("n9", "9кл"), ("n9_a", "9кл(+)"),
+                          ("n10", "10кл"), ("n10_a", "10кл(+)"),
+                          ("n11", "11кл"), ("n11_a", "11кл(+)")])
 
     _required_general_options = {"settings", "seats", "klass", "school"}
 
@@ -630,6 +703,7 @@ class Auditory(SafeClass):
     def __eq__(self, other):
         return self.inner_name == other.inner_name
 
+    @property
     def info(self):
         info = self.get_mapping_info()
         info["name"] = self.inner_name
@@ -647,18 +721,18 @@ class Auditory(SafeClass):
         message = """
 Аудитрия [{av}] {name}
 Доступность: K[{com}], И[{ind}]
-Всего мест:         {capacity: <3}| 8  класс[{kl8}]:{n8}
-Посажено:           {total: <3}| 9  класс[{kl9}]:{n9}
-Из них командных:   {team_members: <3}| 10 класс[{kl10}]:{n10}
-Всего команд:       {teams: <3}| 11 класс[{kl11}]:{n11}
-""".format(**self.info())
+Всего мест:         {capacity: <3}| 8  класс[{kl8}]:{n8:<3}({n8_a})
+Посажено:           {total: <3}({arrived:<3})| 9  класс[{kl9}]:{n9:<3}({n9_a})
+Из них командных:   {team_members: <3}({team_members_arrived:<3})| 10 класс[{kl10}]:{n10:<3}({n10_a})
+Всего команд:       {teams: <3}({teams_arrived:<3})| 11 класс[{kl11}]:{n11:<3}({n11_a})
+""".format(**self.info)
         return message
 
     def __repr__(self):
         mes = "<{0}: cap={1}>"
         return mes.format(self.inner_name, self.capacity)
 
-    def map_with_data_to_writer(self, writer, name_format, data):
+    def map_with_data_to_writer(self, writer, name_format, seats_format, data):
         dy = 1
         dx = 0
         writer.write(0, 0, self.inner_name, name_format)
@@ -668,12 +742,16 @@ class Auditory(SafeClass):
         for x in range(self.shape[1]):
             writer.write(0 + dy, x + 1 + dx, "место " + str(x + 1))
         for y, x in product(range(self.shape[0]), range(self.shape[1])):
-            task = self.get_data((y + dy, x + dx))
-            if task:
-                task = task[data]
-            writer.write(y + 1 + dy, x + 1 + dx, task)
+            person = self.get_data((y, x))
+            if self.m[(y, x)]:
+                task = person[data]
+            elif self.m[(y, x)].status:
+                task = "..."
+            else:
+                task = "______"
+            writer.write(y + 1 + dy, x + 1 + dx, task, seats_format)
 
-    def map_with_status_to_writer(self, writer, name_format):
+    def map_with_status_to_writer(self, writer, name_format, seats_format):
         dy = 1
         dx = 0
         writer.write(0, 0, self.inner_name, name_format)
@@ -683,10 +761,10 @@ class Auditory(SafeClass):
         for x in range(self.shape[1]):
             writer.write(0 + dy, x + 1 + dx, "место " + str(x + 1))
         for y, x in product(range(self.shape[0]), range(self.shape[1])):
-            task = "проход"
+            task = "______"
             if self._seats_map[y, x].status:
                 task = str(self._seats_map[y, x].yx)
-            writer.write(y + 1 + dy, x + 1 + dx, task)
+            writer.write(y + 1 + dy, x + 1 + dx, task, seats_format)
 
     def people_table(self):
         table = pd.DataFrame.from_records(self.get_all_seated())

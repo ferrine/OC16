@@ -2,6 +2,7 @@ import datetime
 import unicodedata
 from collections import OrderedDict as oDict
 
+
 def mutable(method):
     """
     Фиксирует дату последнего изменения в переменной last_change

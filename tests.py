@@ -8,13 +8,16 @@ import xlsxwriter
 def con_test():
     con = globals()["c"]
     prefix = "test_out\\"
-    people = "exceltestdata/people.xlsx"
+    people = "exceltestdata\\people.xlsx"
+    emails = "exceltestdata\\people1.xlsx"
     print("getting people")
     con.load_people(people)
+    con.load_emails(emails)
     print("got people")
     print("rassadka...")
     try:
         con.place_them()
+        con.mark_arrival_by_email()
         print("...end")
     except rassadka_exceptions.NoFreeAuditory:
         print("...bad end")
@@ -26,7 +29,7 @@ def con_test():
     con.write_maps_with_data(open(prefix + "with_klass.xlsx", "wb"), "klass")
     con.write_maps_with_status(open(prefix + "with_status.xlsx", "wb"))
     con.xlsx_summary(open(prefix + "Статистика по аудиториям.xlsx", "wb"))
-
+    print(con)
 
 def update_test():
     con = globals()["c"]

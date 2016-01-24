@@ -128,7 +128,7 @@ class Checker(SafeClass):
         :param task:    (check klass?, check school?)
         :return: bool
         """
-        if one is None or two is None:
+        if not one or not two:
             return True
 
         res = True
