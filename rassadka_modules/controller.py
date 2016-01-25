@@ -355,7 +355,7 @@ class Controller(SafeClass):
     def summary_to_excel(self, file):
         with pd.ExcelWriter(file) as writer:
             summary = list()
-            for aud in self.auds.values():
+            for aud in sorted(self.auds.values()):
                 summary.append(aud.info)
             table = pd.DataFrame.from_records(summary, index="name")
             table.ix[:, Auditory.export_names.keys()].rename(columns=Auditory.export_names).to_excel(writer)
@@ -391,7 +391,7 @@ class Controller(SafeClass):
             form = workbook.add_format()
             form.set_align('center')
             form.set_bold()
-            for aud in self.auds.values():
+            for aud in sorted(self.auds.values()):
                 sheet = workbook.add_worksheet(aud.inner_name)
                 aud.map_with_data_to_writer(sheet, form, data)
                 sheet.set_header("&L&30 " + aud.inner_name)
@@ -415,7 +415,7 @@ class Controller(SafeClass):
             form = workbook.add_format()
             form.set_align('center')
             form.set_bold()
-            for aud in self.auds.values():
+            for aud in sorted(self.auds.values()):
                 sheet = workbook.add_worksheet(aud.inner_name)
                 aud.map_with_status_to_writer(sheet, form)
                 sheet.set_header("&L&30 " + aud.inner_name)
@@ -437,7 +437,7 @@ class Controller(SafeClass):
         :return:
         """
         with pd.ExcelWriter(file) as writer:
-            for aud in self.auds.values():
+            for aud in sorted(self.auds.values()):
                 aud.people_table.ix[:, self._razdatka_cols].sort_values("fam", ascending=True).rename(
                         columns=self._default_full_dict).to_excel(
                         writer, aud.inner_name, index=False)
