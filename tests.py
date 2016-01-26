@@ -29,10 +29,10 @@ def con_test():
     con.seated_to_excel(open(prefix + "Рассаженные участники full.xlsx", "wb"), full=True)
 
     print("\twhole_sum.txt")
-    print(con.summary_to_string(), file=open(prefix + "whole_sum.txt", "w"))
+    con.summary_to_txt(file=open(prefix + "whole_sum.txt", "w"))
 
     print("\twith_klass.xlsx")
-    con.maps_with_data_to_excel(open(prefix + "with_klass.xlsx", "wb"), "klass")
+    con.maps_with_data_to_excel("klass", open(prefix + "with_klass.xlsx", "wb"))
 
     print("\twith_status.xlsx")
     con.maps_with_status_to_excel(open(prefix + "with_status.xlsx", "wb"))

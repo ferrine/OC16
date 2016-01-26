@@ -138,7 +138,7 @@ class Seat:
         elif not new_data.get("arrived", False) and self.data.get("arrived", False):
             self._minus_arrived()
         self.data = new_data
-        if "arrived" not in self.data.keys:
+        if "arrived" not in self.data.keys():
             self.data["arrived"] = False
 
     def get_placed(self) -> dict:
@@ -276,6 +276,14 @@ class Mapping:
             if seat.data["team"] != "и":
                 team_num.add(seat.data["team"])
         return team_num
+
+    @property
+    def keys(self) -> list:
+        keys = list()
+        for seat in self.m[np.where(self.m)].tolist():
+            if seat.lock_key:
+                keys.append(seat.lock_key)
+        return keys
 
     @property
     def teams_arrived_set(self) -> set:

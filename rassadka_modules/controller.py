@@ -16,10 +16,10 @@ from rassadka_modules.safe_class import SafeClass
 
 
 class Controller(SafeClass):
-    _required_input_cols = oDict([("email", "email"), ("fam", "Фамилия"), ("name", "Имя"), ("otch", "Отчество"),
-                                 ("town", "Город"), ("school", "Школа"), ("team", "Команда"),
-                                 ("klass", "Класс")])
-    _default_full_dict = _required_input_cols.copy()
+    required_data_cols = oDict([("email", "email"), ("fam", "Фамилия"), ("name", "Имя"), ("otch", "Отчество"),
+                                ("town", "Город"), ("school", "Школа"), ("team", "Команда"),
+                                ("klass", "Класс")])
+    _default_full_dict = required_data_cols.copy()
     _default_full_dict.update([("aud", "Ауд."), ("row", "Ряд"),
                                ("col", "Место"), ("arrived", "Отметка о прибытии")])
     _mini_out = ["fam", "name", "otch", "aud", "row", "col"]
@@ -30,13 +30,15 @@ class Controller(SafeClass):
         message = """
 Последнее изменение {last_change}
 Режим -{mode}-
-Загружено        человек    {people}
-                 команд     {n_teams}
-                 emails     {emails}
+Загружено(сидит) человек    {people:<5}({intersect_people})
+                 команд     {n_teams:<5}({intersect_teams})
+                 emails     {emails:<5}({intersect_emails})
 Доступно(всего)  аудиторий  {n_used_auds:<5}({n_auds})
                  мест       {seats_available:<5}({seats_total})
 Посажено(пришло) человек    {seated:<5}({arrived})
-                 команд     {seated_teams:<5}({arrived_teams})""".format(**self.info)
+                 команд     {seated_teams:<5}({arrived_teams})
+Ключи {{ключ: количество}}
+    {keys}""".format(**self.info)
         return message
 
     def __init__(self, file, from_pickle=False):
@@ -162,7 +164,7 @@ class Controller(SafeClass):
     def load_people(self, file):
         """
         Требования к входным данным:
-        1) см _required_input_cols
+        1) см required_data_cols
         2) если с целью получить права editor, то
            надо дополнительно указать все места
            Аудитория, Ряд, Место
@@ -171,10 +173,10 @@ class Controller(SafeClass):
         self.teams = list()
         people = pd.read_excel(file, sheetname=0).applymap(clr)
         if not self._check_settings(fact=set(people.columns),
-                                    req=set(self._required_input_cols.values()),
+                                    req=set(self.required_data_cols.values()),
                                     way=">="):
             raise NotEnoughSettings(fact=set(people.columns),
-                                    req=set(self._required_input_cols.values()),
+                                    req=set(self.required_data_cols.values()),
                                     way=">=")
         people = people.rename(columns=swap(self._default_full_dict))
         if (any([item in people.columns for item in ["aud", "row", "col"]]) and
@@ -209,7 +211,7 @@ class Controller(SafeClass):
         :return:
         """
         for aud in self.auds.values():
-            aud.clean_seated()
+            aud.clean_all()
 
     @mutable
     def lock_seated_on_key(self, key: str):
@@ -221,8 +223,10 @@ class Controller(SafeClass):
         :param key: Ключ
         :return:
         """
+        if not key:
+            raise ControllerException
         for aud in self.auds.values():
-            aud.lock_seated_on_key(key)
+            aud.lock_all(key)
         self.key_holder.add(key)
 
     @mutable
@@ -234,10 +238,10 @@ class Controller(SafeClass):
         """
         if key in self.key_holder:
             for aud in self.auds.values():
-                aud.unlock_seated_by_key(key)
+                aud.unlock_all(key)
             self.key_holder.remove(key)
         else:
-            raise KeyError(key)
+            raise ControllerException(key)
 
     @mutable
     def mark_arrival_by_email(self):
@@ -346,11 +350,11 @@ class Controller(SafeClass):
         frame = pd.DataFrame.from_dict(seated)
         return frame
 
-    def summary_to_string(self):
+    def summary_to_txt(self, file):
         message = ""
         for aud in sorted(self.auds.values()):
             message += aud.summary + "\n"
-        return message
+        file.write(message)
 
     def summary_to_excel(self, file):
         with pd.ExcelWriter(file) as writer:
@@ -381,7 +385,7 @@ class Controller(SafeClass):
             sheet.hide_gridlines(0)
             sheet.set_paper(9)
 
-    def maps_with_data_to_excel(self, file, data):
+    def maps_with_data_to_excel(self, data, file):
         """
         Выводит карту рассадки в эксель с необходимой информацией
         :param file: куда выводим
@@ -461,6 +465,15 @@ class Controller(SafeClass):
 
     @property
     def info(self):
+        def s(x, subset, condition=None):
+            if not len(x):
+                return set()
+            else:
+                if not condition:
+                    return set(x.ix[:, subset])
+                else:
+                    return set(x.query(condition).ix[:, subset])
+
         info = dict()
         info["last_change"] = self.last_change
         info["n_auds"] = len(self.auds)
@@ -475,6 +488,12 @@ class Controller(SafeClass):
         info["mode"] = self.mode["people"]
         info["emails"] = len(self.email_handle)
         info["people"] = len(self.people)
+        info["intersect_teams"] = len(s(self.people, "team", condition="team != 'и'") & s(self.seated_people, "team"))
+        info["intersect_people"] = len(s(self.people, "email") & s(self.seated_people, "email"))
+        info["intersect_emails"] = len(set(self.email_handle) & s(self.seated_people, "email"))
         info["n_teams"] = len(self.teams)
+        all_keys = reduce(list.__add__, [aud.keys for aud in self.auds.values()], [])
+        key, frequency = np.unique(all_keys, return_counts=True)
+        info["keys"] = dict(zip(key, frequency))
         return info
 

@@ -6,14 +6,18 @@
       <w>auds</w>
       <w>audstatus</w>
       <w>boolmatrix</w>
+      <w>cascadeopts</w>
       <w>compart</w>
       <w>coords</w>
       <w>ender</w>
       <w>exceltestdata</w>
       <w>goodpath</w>
       <w>inds</w>
+      <w>itemopts</w>
       <w>klass</w>
       <w>klasses</w>
+      <w>menubindage</w>
+      <w>menuopts</w>
       <w>otch</w>
       <w>rassadka</w>
       <w>razdatka</w>
