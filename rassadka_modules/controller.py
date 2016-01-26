@@ -253,7 +253,7 @@ class Controller(SafeClass):
         for email in self.email_handle:
             try:
                 seat = self.coords_by_email(email)
-                self.auds[seat["aud"]].mark_arrival_by_coords((seat["row"], seat["col"]))
+                self.auds[str(seat["aud"])].mark_arrival_by_coords((seat["row"], seat["col"]))
                 self.key_holder.add("arrival")
             except KeyError:
                 continue

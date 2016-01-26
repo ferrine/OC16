@@ -8,7 +8,7 @@ import os
 
 class RassadkaGUI(tk.Tk, TkTools):
     __SIZE = (500, 250, 500, 250)
-    __GUI_GEOM = str(__SIZE[0]) + "x" + str(__SIZE[1]) + "+" + str(__SIZE[2]) + "+" + str(__SIZE[3])
+    __GUI_GEOM = "%dx%d+%d+%d" % __SIZE
     __POP_POS = "+" + str(int(__SIZE[2] + 0.5 * __SIZE[0])) + "+" + str(int(__SIZE[3] + 0.5 * __SIZE[1]))
     __CONTROLLER_FILENAME = "controller.pkl"
     __DEFAULT_APP_PATH = os.environ.get("USERPROFILE") + "\\.rassadka\\"
@@ -98,7 +98,8 @@ class RassadkaGUI(tk.Tk, TkTools):
                                                         label="Игнорировать ли блокировку?")}
         commands["Волшебство"]["Опасно"]["Очень опасно"] = oDict()    
         commands["Волшебство"]["Опасно"]["Очень опасно"]["Удалить загрузочный файл"] = { 
-            "command": lambda: self.__SAVE_ON_EXIT.set(False)
+            "command": lambda: self.__SAVE_ON_EXIT.set(False),
+            "background": "red"
         }
         self._create_menu(menu, commands, menuopts=dict(tearoff=0))
         self.bind_all("<Button-1>", self.upd, add="+")
