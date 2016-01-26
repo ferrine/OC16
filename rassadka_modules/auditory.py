@@ -91,6 +91,8 @@ class Seat:
         if self.data:
             raise BadSeat("Место не пусто!")
         self.data = person
+        if self.data.get("arrived"):
+            self._minus_arrived()
         self.data["arrived"] = False
         self._plus_seated()
 
@@ -102,6 +104,8 @@ class Seat:
         if not self.data:
             raise BadSeat("Место уже пусто!")
         self._minus_seated()
+        if self.data.get("arrived"):
+            self._minus_arrived()
         self.data = dict()
 
     def lock(self, key):
@@ -707,7 +711,7 @@ class Auditory(SafeClass):
         message = """
 Аудитрия [{av}] {name}
 Доступность: K[{com}], И[{ind}]
-Всего мест:         {capacity: <3}| 8  класс[{kl8}]:{n8:<3}({n8_a})
+Всего мест:         {capacity: <3}     | 8  класс[{kl8}]:{n8:<3}({n8_a})
 Посажено:           {total: <3}({arrived:<3})| 9  класс[{kl9}]:{n9:<3}({n9_a})
 Из них командных:   {team_members: <3}({team_members_arrived:<3})| 10 класс[{kl10}]:{n10:<3}({n10_a})
 Всего команд:       {teams: <3}({teams_arrived:<3})| 11 класс[{kl11}]:{n11:<3}({n11_a})

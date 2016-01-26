@@ -3,18 +3,21 @@ from tkinter import filedialog
 from collections import OrderedDict as oDict
 from rassadka_modules.controller import Controller, ControllerException
 from rassadka_modules.tktools import TkTools
+import os
 
 
 class RassadkaGUI(tk.Tk, TkTools):
-    SIZE = (500, 250, 500, 250)
-    GUI_GEOM = str(SIZE[0]) + "x" + str(SIZE[1]) + "+" + str(SIZE[2]) + "+" + str(SIZE[3])
-    POP_POS = "+" + str(int(SIZE[2] + 0.5 * SIZE[0])) + "+" + str(int(SIZE[3] + 0.5 * SIZE[1]))
-
-    default_controller_path = "test_out\\gui_controller.pkl"
+    __SIZE = (500, 250, 500, 250)
+    __GUI_GEOM = str(__SIZE[0]) + "x" + str(__SIZE[1]) + "+" + str(__SIZE[2]) + "+" + str(__SIZE[3])
+    __POP_POS = "+" + str(int(__SIZE[2] + 0.5 * __SIZE[0])) + "+" + str(int(__SIZE[3] + 0.5 * __SIZE[1]))
+    __CONTROLLER_FILENAME = "controller.pkl"
+    __DEFAULT_APP_PATH = os.environ.get("USERPROFILE") + "\\.rassadka\\"
+    if not os.path.exists(__DEFAULT_APP_PATH):
+        os.mkdir(__DEFAULT_APP_PATH)
 
     def _load_controller(self):
         try:
-            file = open(self.default_controller_path, "rb")
+            file = open(self.__DEFAULT_APP_PATH + self.__CONTROLLER_FILENAME, "rb")
             self.controller = Controller(file, from_pickle=True)
         except FileNotFoundError:
             filename = filedialog.Open(self,
@@ -34,7 +37,8 @@ class RassadkaGUI(tk.Tk, TkTools):
 
     def __init__(self):
         tk.Tk.__init__(self)
-        self.geometry(self.GUI_GEOM)
+        self.__SAVE_ON_EXIT = tk.BooleanVar(self, value=True)
+        self.geometry(self.__GUI_GEOM)
         self.label = tk.Label(self, text="Tap anywhere to refresh info",
                               justify="left",
                               font="Courier 7")
@@ -83,13 +87,19 @@ class RassadkaGUI(tk.Tk, TkTools):
                                                                                  self.controller.lock_seated_on_key)}
         commands["Волшебство"]["Открепить по ключу"] = {"command": self.key_usage(func=
                                                                                   self.controller.unlock_seated_by_key)}
-        commands["Волшебство"]["Обновить по местам"] = {"command":
+        commands["Волшебство"]["Отметка о прибытии"] = {"command": self.controller.mark_arrival_by_email}
+        commands["Волшебство"]["Удалить по местам"] = {"command": self.controller.remove_seated_by_coords}
+        commands["Волшебство"]["Удалить по Email"] = {"command": self.controller.remove_seated_by_email}
+        commands["Волшебство"]["Опасно"] = oDict()
+        commands["Волшебство"]["Опасно"]["Удалить всех"] = {"command": self.controller.clean_seated}
+        commands["Волшебство"]["Опасно"]["Обновить по местам"] = {"command":
                                             self.yes_no(lambda event: self.controller.update_seated_by_coords(True),
                                                         lambda event: self.controller.update_seated_by_coords(False),
                                                         label="Игнорировать ли блокировку?")}
-        commands["Волшебство"]["Удалить по местам"] = {"command": self.controller.remove_seated_by_coords}
-        commands["Волшебство"]["Удалить по Email"] = {"command": self.controller.remove_seated_by_email}
-        commands["Волшебство"]["Удалить всех"] = {"command": self.controller.clean_seated}
+        commands["Волшебство"]["Опасно"]["Очень опасно"] = oDict()    
+        commands["Волшебство"]["Опасно"]["Очень опасно"]["Удалить загрузочный файл"] = { 
+            "command": lambda: self.__SAVE_ON_EXIT.set(False)
+        }
         self._create_menu(menu, commands, menuopts=dict(tearoff=0))
         self.bind_all("<Button-1>", self.upd, add="+")
         self.config(menu=menu)
@@ -108,31 +118,39 @@ class RassadkaGUI(tk.Tk, TkTools):
             self.upd()
         return wrapper
 
-    def save(self, parent, item, filetypes=(('Excel files', '.xlsx'), ('txt files', '.txt')), for_item=None, **kwargs):
+    def save(self, parent, item, filetypes=(('Excel files', '.xlsx'),), for_item=None, **kwargs):
         if not for_item:
             for_item = dict()
 
         def wrapper():
             path = tk.filedialog.SaveAs(parent, filetypes=filetypes,
-                                        initialfile="output.xlsx", **kwargs).show()
+                                        initialfile="output", **kwargs).show()
             if not path:
                 return
+            if not path.endswith(filetypes[0][-1]):
+                path = path + filetypes[0][-1]
             file = open(path, "w" if path.endswith(".txt") else "wb")
             item(file=file, **for_item)
             self.upd()
         return wrapper
 
     def on_exit(self):
-        self.controller.to_pickle(open(self.default_controller_path, "wb"))
+        if self.__SAVE_ON_EXIT.get():
+            self.controller.to_pickle(open(self.__DEFAULT_APP_PATH + self.__CONTROLLER_FILENAME, "wb"))
+        else:
+            try:
+                os.remove(self.__DEFAULT_APP_PATH + self.__CONTROLLER_FILENAME)
+            except (NotImplementedError, FileNotFoundError):
+                pass
         self.destroy()
 
     def key_usage(self, func, label="Key"):
         def wrapper():
             pop_up = tk.Toplevel(self)
-            pop_up.geometry(self.POP_POS)
-            tk.Label(pop_up, text=label).grid(column=2, row=0, sticky="e")
+            pop_up.geometry(self.__POP_POS)
+            tk.Label(pop_up, text=label).grid(column=0, row=0, sticky="e")
             inp = tk.Entry(pop_up, width=16)
-            inp.grid(column=4, row=0)
+            inp.grid(column=1, row=0)
 
             def ok(event):
                 user_input = inp.get()
@@ -144,13 +162,13 @@ class RassadkaGUI(tk.Tk, TkTools):
             button = tk.Button(pop_up, text="OK", command=pop_up.destroy)
             button.bind("<Button-1>", ok, add="+")
             button.bind("<Button-1>", self.upd, add="+")
-            button.grid(column=2, row=1, columnspan=5)
+            button.grid(column=0, row=1, columnspan=2, sticky="we")
         return wrapper
 
     def yes_no(self, yes_event, no_event, label=""):
         def wrapper():
             pop_up = tk.Toplevel(self)
-            pop_up.geometry(self.POP_POS)
+            pop_up.geometry(self.__POP_POS)
             pop_up.label = tk.Label(pop_up, text=label)
             pop_up.label.pack(side="top")
             yes = tk.Button(pop_up, text="Да", command=pop_up.destroy)
@@ -162,6 +180,8 @@ class RassadkaGUI(tk.Tk, TkTools):
             yes.pack(side="left")
             no.pack(side="right")
         return wrapper
+
+
 
 
 if __name__ == '__main__':
