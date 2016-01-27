@@ -3,6 +3,7 @@ import random
 import numpy as np
 import pandas as pd
 import xlsxwriter
+import warnings
 
 from functools import reduce
 from pandas import ExcelFile
@@ -76,6 +77,7 @@ class Controller(SafeClass):
             if "main_settings" not in unresolved_dict.keys():
                 tmp = Auditory(unresolved_dict, outer_name=name)
                 if tmp.inner_name in self.auds.keys():
+                    del tmp
                     raise TypeError("Есть одинаковые аудитории")
                 else:
                     self.auds[tmp.inner_name] = tmp
@@ -148,6 +150,27 @@ class Controller(SafeClass):
     @mutable
     def switch_off_aud(self, audname):
         self.auds[audname].switch_off()
+
+    @mutable
+    def load_auditory(self, file):
+        excel_file = ExcelFile(file)
+        for name in excel_file.sheet_names:
+            raw_frame = excel_file.parse(name, index_col=None, header=None)
+            unresolved_dict = splitter(raw_frame, named=True)
+            if "settings" in unresolved_dict.keys():
+                tmp = Auditory(unresolved_dict, outer_name=name)
+                if tmp.inner_name in self.auds.keys():
+                    del tmp
+                    warnings.warn("Аудитории с одинаковыми названиями не загружены")
+                else:
+                    self.auds[tmp.inner_name] = tmp
+
+    @mutable
+    def delete_auditory(self, audname):
+        try:
+            del self.auds[str(audname)]
+        except KeyError:
+            raise ControllerException("Такой аудитории не существует: {}".format(audname))
 
     @mutable
     def load_emails(self, file):
@@ -224,7 +247,7 @@ class Controller(SafeClass):
         :return:
         """
         if not key:
-            raise ControllerException
+            raise ControllerException(key)
         for aud in self.auds.values():
             aud.lock_all(key)
         self.key_holder.add(key)

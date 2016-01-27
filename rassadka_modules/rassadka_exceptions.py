@@ -2,7 +2,27 @@ import datetime
 
 
 class ControllerException(Exception):
-    pass
+
+    def header(self):
+            return ""
+
+    @staticmethod
+    def ender():
+        return ""
+
+    def message(self):
+        return self.info
+
+    def __init__(self, message, **kwargs):
+        super().__init__(**kwargs)
+        self.info = message
+
+    @property
+    def full_message(self):
+        return self.header() + self.message() + self.ender()
+
+    def __str__(self):
+        return self.full_message
 
 
 class CheckerException(ControllerException):
@@ -66,9 +86,6 @@ class UserErrorException(ControllerException):
             log.write(self.header())
             log.write(self.message())
             log.write(self.ender())
-
-    def __str__(self):
-        return self.message()
 
 
 class NotEnoughSettings(UserErrorException):

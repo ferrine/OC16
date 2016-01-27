@@ -804,5 +804,10 @@ class Auditory(SafeClass):
             self.settings["available"] = 0
             Seat.counters["total"] -= self.capacity
 
+    def __del__(self):
+        Seat.counters["seated"] -= self.info["total"]
+        Seat.counters["arrived"] -= self.info["arrived"]
+        Seat.counters["total"] -= self.capacity
+
 if __name__ == "__main__":
     pass

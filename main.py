@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import filedialog
 from collections import OrderedDict as oDict
 from rassadka_modules.controller import Controller, ControllerException
-from rassadka_modules.tktools import TkTools
+from rassadka_modules.tktools import TkTools, ExceptionRedirect
 import os
 
 
@@ -90,6 +90,7 @@ class RassadkaGUI(tk.Tk, TkTools):
         commands["Волшебство"]["Отметка о прибытии"] = {"command": self.controller.mark_arrival_by_email}
         commands["Волшебство"]["Удалить по местам"] = {"command": self.controller.remove_seated_by_coords}
         commands["Волшебство"]["Удалить по Email"] = {"command": self.controller.remove_seated_by_email}
+        commands["Волшебство"]["Добавить аудиторию"] = {"command": self.load(self, self.controller.load_auditory)}
         commands["Волшебство"]["Опасно"] = oDict()
         commands["Волшебство"]["Опасно"]["Удалить всех"] = {"command": self.controller.clean_seated}
         commands["Волшебство"]["Опасно"]["Обновить по местам"] = {"command":
@@ -101,7 +102,12 @@ class RassadkaGUI(tk.Tk, TkTools):
             "command": lambda: self.__SAVE_ON_EXIT.set(False),
             "background": "red"
         }
-        self._create_menu(menu, commands, menuopts=dict(tearoff=0))
+        commands["Волшебство"]["Опасно"]["Очень опасно"]["Удалить аудиторию"] = {
+            "command": self.key_usage(self.controller.delete_auditory, label="Название аудитории"),
+            "background": "red"
+        }
+
+        self._create_menu(menu, commands, menuopts=dict(tearoff=0), redirect=ControllerException)
         self.bind_all("<Button-1>", self.upd, add="+")
         self.config(menu=menu)
 
@@ -146,6 +152,8 @@ class RassadkaGUI(tk.Tk, TkTools):
         self.destroy()
 
     def key_usage(self, func, label="Key"):
+        func = ExceptionRedirect(func, ControllerException)
+
         def wrapper():
             pop_up = tk.Toplevel(self)
             pop_up.geometry(self.__POP_POS)
@@ -155,10 +163,7 @@ class RassadkaGUI(tk.Tk, TkTools):
 
             def ok(event):
                 user_input = inp.get()
-                try:
-                    func(user_input)
-                except ControllerException:
-                    pass
+                func(user_input)
 
             button = tk.Button(pop_up, text="OK", command=pop_up.destroy)
             button.bind("<Button-1>", ok, add="+")
@@ -167,6 +172,9 @@ class RassadkaGUI(tk.Tk, TkTools):
         return wrapper
 
     def yes_no(self, yes_event, no_event, label=""):
+        yes_event = ExceptionRedirect(yes_event, ControllerException)
+        no_event = ExceptionRedirect(no_event, ControllerException)
+
         def wrapper():
             pop_up = tk.Toplevel(self)
             pop_up.geometry(self.__POP_POS)
