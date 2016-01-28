@@ -57,7 +57,7 @@ class UserErrorException(ControllerException):
 
     def header(self):
         line = """
-=============={sit: ^40}==============
+{sit: ^40}
 Дата: {date}
 
     Возникло при тесте: {where}
@@ -70,13 +70,13 @@ class UserErrorException(ControllerException):
         return line
 
     def message(self):
-        mes = "|Возникло {0}".format(type(self).__name__)
+        mes = "Возникло {0}".format(type(self).__name__)
         return mes
 
     @staticmethod
     def ender():
-        return """|
-|Без указанных требований выполнение программы невозможно
+        return """
+Без указанных требований выполнение программы невозможно
 
 
 """
@@ -96,16 +96,16 @@ class NotEnoughSettings(UserErrorException):
 
     def message(self):
         mes = """
-|Дополнительная информация
-|
-|        Ожидается: {exp}
-|        Получено:  {cur}
-|
-|        Разность между входными и ожидаемыми: {ce}
-|        Разность между ожидаемыми и входными: {ec}
-|
-|Учитывая операции над множествами нужно добиться:
-|               Входные {way} Необходимые
+Дополнительная информация
+
+        Ожидается: {exp}
+        Получено:  {cur}
+
+        Разность между входными и ожидаемыми: {ce}
+        Разность между ожидаемыми и входными: {ec}
+
+Учитывая операции над множествами нужно добиться:
+               Входные {way} Необходимые
 """.format(exp=self.expected,
            cur=self.current,
            ce=self.current - self.expected,
@@ -118,10 +118,10 @@ class ValuesConditionException(UserErrorException):
     situation = "Входные данные не допустимы"
 
     def message(self):
-        mes = "|{0: <16}|{1: <8}|{2: <25}|{3:<10}|\n".format("Переменная", "Значение", "Условие", "Выполнение")
+        mes = "{0: <16}{1: <8}{2: <25}{3:<10}\n".format("Переменная", "Значение", "Условие", "Выполнение")
         mes += "+" + "-"*16 + "+" + "-"*8 + "+" + "-"*25 + "+" + "-"*10 + "+\n"
         for f in self.current:
-            mes += "|{0: <16}|{1: <8}|{2: <25}|{3: <10}|\n".format(str(f),
+            mes += "{0: <16}{1: <8}{2: <25}{3: <10}\n".format(str(f),
                                                                    str(self.current[f]),
                                                                    str(self.expected.get(f)),
                                                                    str(self.expected.get(f)(self.current[f])))
@@ -138,13 +138,13 @@ class WrongMatrixInputException(UserErrorException):
 
     def message(self):
         mes = """
-|Дополнительная информация
-|
-|       Описание проблемы:
-|           {problem}
-|
-|       Возможное решение:
-|           {solution}
+Дополнительная информация
+
+       Описание проблемы:
+           {problem}
+
+       Возможное решение:
+           {solution}
 """.format(problem=self.problem,
            solution=self.solution())
         return mes
@@ -162,9 +162,9 @@ class WrongShapeException(WrongMatrixInputException):
 
     def solution(self):
         solv = """Поменяйте размерность матрицы
-|           Ожидаемая размерность: {exp}
-|           Текущая размерность:   {cur}
-|""".format(exp=self.expected,
+           Ожидаемая размерность: {exp}
+           Текущая размерность:   {cur}
+""".format(exp=self.expected,
             cur=self.current,
             problem=self.problem)
         return solv
