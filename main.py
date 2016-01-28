@@ -1,9 +1,10 @@
+import os
 import tkinter as tk
 from tkinter import filedialog
 from collections import OrderedDict as oDict
-from rassadka_modules.controller import Controller, ControllerException
-from rassadka_modules.tktools import TkTools, ExceptionRedirect
-import os
+from rassadka_modules.controller import Controller
+from rassadka_modules.tktools import TkTools
+from tkinter.messagebox import showerror
 
 
 class RassadkaGUI(tk.Tk, TkTools):
@@ -107,7 +108,7 @@ class RassadkaGUI(tk.Tk, TkTools):
             "background": "red"
         }
 
-        self._create_menu(menu, commands, menuopts=dict(tearoff=0), redirect=ControllerException)
+        self._create_menu(menu, commands, menuopts=dict(tearoff=0))
         self.bind_all("<Button-1>", self.upd, add="+")
         self.config(menu=menu)
 
@@ -152,8 +153,6 @@ class RassadkaGUI(tk.Tk, TkTools):
         self.destroy()
 
     def key_usage(self, func, label="Key"):
-        func = ExceptionRedirect(func, ControllerException)
-
         def wrapper():
             pop_up = tk.Toplevel(self)
             pop_up.geometry(self.__POP_POS)
@@ -172,9 +171,6 @@ class RassadkaGUI(tk.Tk, TkTools):
         return wrapper
 
     def yes_no(self, yes_event, no_event, label=""):
-        yes_event = ExceptionRedirect(yes_event, ControllerException)
-        no_event = ExceptionRedirect(no_event, ControllerException)
-
         def wrapper():
             pop_up = tk.Toplevel(self)
             pop_up.geometry(self.__POP_POS)
@@ -190,7 +186,8 @@ class RassadkaGUI(tk.Tk, TkTools):
             no.pack(side="right")
         return wrapper
 
-
+    def report_callback_exception(self, exc, val, tb):
+        showerror("Ошибка", message=str(val))
 
 
 if __name__ == '__main__':
