@@ -1,10 +1,94 @@
 import os
 import tkinter as tk
 from tkinter import filedialog
+from rassadka_modules.check_system import Checker
 from collections import OrderedDict as oDict
 from rassadka_modules.controller import Controller
 from rassadka_modules.tktools import TkTools
 from tkinter.messagebox import showerror
+
+
+class Settings(tk.Toplevel):
+
+    def __init__(self, master, items, *args, **kwargs):
+        tk.Toplevel.__init__(self, master=master, *args, **kwargs)
+        self.geometry("+500+300")
+        self.items = {item.inner_name: item for item in items}
+        self.buttons_lay = dict()
+        self.current = tk.StringVar(self, "None")
+        self.select_menu = tk.OptionMenu(self, self.current, *[item.inner_name for item in items],
+                                         command=self._make_layout)
+        self.select_menu.grid(row=0, column=0, columnspan=2, sticky="we")
+
+    def _make_layout(self, name):
+        for widget in self.buttons_lay.values():
+            widget.grid_forget()
+        item = self.items[name]
+        self.buttons_lay = dict()
+        self.vars = dict()
+        self.row = 1
+        self._check_buttons(self.row, item)
+        self._radio_buttons(self.row, item)
+        self._scale_buttons(self.row, item)
+        self._make_button(self.row, item)
+
+    def _make_button(self, start_row, item):
+        def _commit_action():
+            new_settings = {setting: var.get() for setting, var in self.vars.items()}
+            item.refresh(new_settings)
+            self.buttons_lay["__label__"] = tk.Label(self, text="OK",
+                                                     justify="left",
+                                                     font="Courier 7")
+            self.buttons_lay["__label__"].grid(column=3, row=start_row)
+        self.buttons_lay["__commit__"] = tk.Button(self, text="Закончить настройку", command=_commit_action)
+        self.buttons_lay["__commit__"].grid(column=1, row=start_row, columnspan=2, sticky="we")
+
+    def _check_buttons(self, start_row, item):
+        if "CHECK" not in dir(item):
+            return
+        pos = 0
+        row = 0
+        for setting in item.CHECK:
+            self.vars[setting] = tk.BooleanVar(self, value=item.settings[setting])
+            self.buttons_lay[setting] = tk.Checkbutton(master=self, text=setting, variable=self.vars[setting])
+            self.buttons_lay[setting].grid(row=pos // 4 + start_row, column=pos % 4,
+                                           sticky="w")
+            pos += 1
+            row = pos // 4 + (pos % 4)
+        self.row = start_row + row
+
+    def _radio_buttons(self, start_row, item):
+        if "RADIO" not in dir(item):
+            return
+        row = 0
+        for setting in item.RADIO:
+            pos = 0
+            self.vars[setting["name"]] = tk.IntVar(self, value=item.settings[setting["name"]])
+            for state in setting["states"]:
+                self.buttons_lay[setting["name"]] = tk.Radiobutton(self, text=setting["name"] + " = " + str(state),
+                                                                   value=state,
+                                                                   variable=self.vars[setting["name"]])
+                self.buttons_lay[setting["name"]].grid(row=row + start_row, column=pos % 4,
+                                                       sticky="w")
+                pos += 1
+            row = pos // 4 + (pos % 4)
+        self.row = start_row + row + 1
+
+    def _scale_buttons(self, start_row, item):
+        if "SCALE" not in dir(item):
+            return
+        row = 0
+        for setting in item.SCALE:
+            self.vars[setting["name"]] = tk.DoubleVar(self, value=item.settings[setting["name"]])
+            self.buttons_lay[setting["name"]] = tk.Scale(self, label=setting["name"],
+                                                         variable=self.vars[setting["name"]],
+                                                         from_=setting["var"][0],
+                                                         to=setting["var"][1],
+                                                         orient="horizontal",
+                                                         resolution=0.01)
+            self.buttons_lay[setting["name"]].grid(row=row + start_row, column=0, sticky="w")
+            row += 1
+        self.row = start_row + row
 
 
 class RassadkaGUI(tk.Tk, TkTools):
@@ -54,14 +138,15 @@ class RassadkaGUI(tk.Tk, TkTools):
         self.info.grid(row=0, column=0)
         menu = tk.Menu(self)
         commands = oDict()
-        commands["Участники"] = oDict()
+        commands["Загрузки"] = oDict()
         commands["Выгрузки"] = oDict()
         commands["Волшебство"] = oDict()
-        commands["Участники"]["Загрузить участников"] = {"command":
-                                                         self.load(parent=self, item=self.controller.load_people)}
-        commands["Участники"]["Загрузить Emails"] = {"command":
-                                                     self.load(parent=self, item=self.controller.load_emails)}
-        commands["Участники"]["Очистить загруженных"] = {"command":self.controller.clear_buffer}
+        commands["Загрузки"]["Загрузить участников"] = {"command":
+                                                        self.load(parent=self, item=self.controller.load_people)}
+        commands["Загрузки"]["Загрузить Emails"] = {"command":
+                                                    self.load(parent=self, item=self.controller.load_emails)}
+        commands["Загрузки"]["Очистить загруженных"] = {"command": self.controller.clear_buffer}
+        commands["Загрузки"]["Добавить аудиторию"] = {"command": self.load(self, self.controller.load_auditory)}
         commands["Выгрузки"]["На стенд"] = {"command": self.save(parent=self, item=self.controller.seated_to_excel,
                                             for_item=dict(full=False))}
         commands["Выгрузки"]["Полная выгрузка"] = {"command":
@@ -77,21 +162,21 @@ class RassadkaGUI(tk.Tk, TkTools):
                                                                item=self.controller.maps_with_status_to_excel,
                                                                filetypes=(('Excel files', '.xlsx'), ))}
         commands["Выгрузки"]["Аудитории..."] = oDict()
-        commands["Выгрузки"]["Аудитории..."]["txt"] = {"command": self.save(parent=self,
-                                                       item=self.controller.summary_to_txt,
-                                                       filetypes=(("txt files", ".txt"), ))}
-        commands["Выгрузки"]["Аудитории..."]["Excel"] = {"command": self.save(parent=self,
-                                                         item=self.controller.summary_to_excel,
-                                                         filetypes=(("Excel files", ".xlsx"), ))}
+        commands["Выгрузки"]["Аудитории..."]["..в txt"] = {"command": self.save(parent=self,
+                                                           item=self.controller.summary_to_txt,
+                                                           filetypes=(("txt files", ".txt"), ))}
+        commands["Выгрузки"]["Аудитории..."]["..в Excel"] = {"command": self.save(parent=self,
+                                                             item=self.controller.summary_to_excel,
+                                                             filetypes=(("Excel files", ".xlsx"), ))}
         commands["Волшебство"]["Рассадить"] = {"command": self.controller.place_loaded_people}
         commands["Волшебство"]["Закрепить на ключ"] = {"command": self.key_usage(func=
                                                                                  self.controller.lock_seated_on_key)}
         commands["Волшебство"]["Открепить по ключу"] = {"command": self.key_usage(func=
                                                                                   self.controller.unlock_seated_by_key)}
         commands["Волшебство"]["Отметка о прибытии"] = {"command": self.controller.mark_arrival_by_email}
-        commands["Волшебство"]["Удалить по местам"] = {"command": self.controller.remove_seated_by_coords}
-        commands["Волшебство"]["Удалить по Email"] = {"command": self.controller.remove_seated_by_email}
-        commands["Волшебство"]["Добавить аудиторию"] = {"command": self.load(self, self.controller.load_auditory)}
+        commands["Волшебство"]["Удалить..."] = oDict()
+        commands["Волшебство"]["Удалить..."]["..по местам"] = {"command": self.controller.remove_seated_by_coords}
+        commands["Волшебство"]["Удалить..."]["..по Email"] = {"command": self.controller.remove_seated_by_email}
         commands["Волшебство"]["Опасно"] = oDict()
         commands["Волшебство"]["Опасно"]["Удалить всех"] = {"command": self.controller.clean_seated}
         commands["Волшебство"]["Опасно"]["Обновить по местам"] = {"command":
@@ -107,7 +192,10 @@ class RassadkaGUI(tk.Tk, TkTools):
             "command": self.key_usage(self.controller.delete_auditory, label="Название аудитории"),
             "background": "red"
         }
-
+        self.test_button = tk.Button(text="Настройки",
+                                     command=lambda: Settings(self, [Checker] +
+                                                              sorted(list(self.controller.auds.values()))))
+        self.test_button.grid(column=0, columnspan=2, sticky="we")
         self._create_menu(menu, commands, menuopts=dict(tearoff=0))
         self.bind_all("<Button-1>", self.upd, add="+")
         self.config(menu=menu)

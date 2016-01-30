@@ -8,10 +8,17 @@ from rassadka_modules.common import Ch
 
 
 class Checker(SafeClass):
+    CHECK = ["cl8_9", "cl8_10", "cl8_11", "cl9_10",
+             "cl9_11", "cl10_11", "one_school",
+             "one_town", "com_in_one",
+             "debug_mode"]
+    # RADIO = [{"name": "over_place", "states": (1, 2)}, {"name": "over_row", "states": (1, 2, 3)}]
+    SCALE = [{"name": "max_compart", "var": (0, 1)}]
+
     def __setattr__(self, key, value):
         raise PermissionError("Sorry")
 
-    outer_name = "Основные настройки"
+    outer_name = inner_name = "Основные настройки"
     settings = dict()
     allowed = set()
     _pre_inited = False
@@ -144,17 +151,7 @@ class Checker(SafeClass):
                     res &= one["town"] != two["town"]
         return res
 
-    def __eq__(self, other):
-        """
-
-        :param other:
-        :return:
-        :type other: Checker
-        """
-        if self._pre_inited != other._pre_inited:
-            return False
-        if self.settings != other.settings:
-            return False
-        if self.allowed != other.allowed:
-            return False
-        return True
+    @classmethod
+    def refresh(cls, new_settings):
+        cls.settings = new_settings
+        cls._eval_klass_conditions()

@@ -356,6 +356,8 @@ class Auditory(SafeClass):
     Имеется ввиду поддержка двойной нумерации, абсолютной для метода проверки
     и относительной для вывода на печать рассадки
     """
+    CHECK = ["available", "class_8", "class_9",             # Для виджета
+             "class_10", "class_11", "individual", "command"]
     export_names = oDict([("old_capacity", "Вместительность"), ("capacity", "Вместительность с доп проходами"),
                           ("total", "Сидит"), ("arrived", "Сидит(+)"),
                           ("teams", "Команд"), ("teams_arrived", "Команд(+)"),
@@ -439,6 +441,17 @@ class Auditory(SafeClass):
         close = set(zip(y, x))
         return close
 
+    def _init_settings_from_dict(self, settings):
+        self.settings = settings
+        self.inner_name = str(self.settings["name"])
+        restricted = set()
+        for cl in ["class_8", "class_9", "class_10", "class_11"]:
+            if not self.settings[cl]:
+                restricted.add(cl)
+        self.restricted_klasses = restricted
+        if self.settings["available"]:
+                Seat.counters["total"] += self.capacity
+
     def _init_settings(self, matrix):
         """
         :type matrix: np.matrix
@@ -473,14 +486,7 @@ class Auditory(SafeClass):
                                            req=self._required_settings_values_condition,
                                            name="Проверка валидности ввода настроек в таблицу",
                                            aud=self.outer_name)
-        self.settings = settings["code"].to_dict()
-        self._settings_table = settings
-        self.inner_name = str(self.settings["name"])
-        restricted = set()
-        for cl in ["class_8", "class_9", "class_10", "class_11"]:
-            if not self.settings[cl]:
-                restricted.add(cl)
-        self.restricted_klasses = restricted
+        self._init_settings_from_dict(settings["code"].to_dict())
 
     def _read_klass(self, matrix) -> set:
         """
@@ -629,8 +635,6 @@ class Auditory(SafeClass):
             klass_yx = self._read_klass(raw_settings["klass"])
             school_yx = self._read_school(raw_settings["school"])
             self._init_seats(raw_settings["seats"])
-            if self.settings["available"]:
-                Seat.counters["total"] += self.capacity
             self.klass_school_town_dyx = self._eval_map_conditions(school=school_yx, klass=klass_yx)
         except UserErrorException as e:
             e.log_error()
@@ -808,6 +812,10 @@ class Auditory(SafeClass):
         Seat.counters["seated"] -= self.info["total"]
         Seat.counters["arrived"] -= self.info["arrived"]
         Seat.counters["total"] -= self.capacity
+
+    def refresh(self, new_settings):
+        self.settings.update(new_settings)
+        self._init_settings_from_dict(self.settings)
 
 if __name__ == "__main__":
     pass
