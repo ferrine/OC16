@@ -42,6 +42,9 @@ class Controller(SafeClass):
     {keys}""".format(**self.info)
         return message
 
+    def __getitem__(self, item):
+        return self.auds[item]
+
     def __init__(self, file, from_pickle=False):
         if from_pickle:
             data = pickle.load(file)
@@ -264,7 +267,7 @@ class Controller(SafeClass):
                 aud.unlock_all(key)
             self.key_holder.remove(key)
         else:
-            raise ControllerException(key)
+            raise ControllerException("Key Error %s" % key)
 
     @mutable
     def mark_arrival_by_email(self):
@@ -295,6 +298,22 @@ class Controller(SafeClass):
             for_insert = new_data.copy()
             del for_insert["aud"], for_insert["row"], for_insert["col"]
             self.auds[new_data["aud"]].update_by_coords((new_data["row"], new_data["col"]), for_insert, forced=forced)
+
+    @mutable
+    def update_seated_by_email(self, forced=False):
+        """
+        Меняет всю информацию на актуальную.
+        Необходимо иметь обычную допустимую входную загрузку
+        :param bool forced: менять ли людей на местах, которые заблокированы?
+        """
+        if "insert" not in self.mode["people"].split("/"):     # Проверка уровня доступа
+            raise ControllerException("PermissionError")
+        for new_data in self.people.to_dict(orient="records"):
+            for_insert = new_data.copy()
+            coords = self.coords_by_email(for_insert["email"])
+            if "edit" in self.mode["people"].split("/"):
+                del for_insert["aud"], for_insert["row"], for_insert["col"]
+            self.auds[coords["aud"]].update_by_coords((coords["row"], coords["col"]), for_insert, forced=forced)
 
     @mutable
     def remove_seated_by_coords(self):
