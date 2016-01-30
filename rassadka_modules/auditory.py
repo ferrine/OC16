@@ -449,8 +449,7 @@ class Auditory(SafeClass):
             if not self.settings[cl]:
                 restricted.add(cl)
         self.restricted_klasses = restricted
-        if self.settings["available"]:
-                Seat.counters["total"] += self.capacity
+
 
     def _init_settings(self, matrix):
         """
@@ -487,6 +486,8 @@ class Auditory(SafeClass):
                                            name="Проверка валидности ввода настроек в таблицу",
                                            aud=self.outer_name)
         self._init_settings_from_dict(settings["code"].to_dict())
+        if self.settings["available"]:
+            self.switch_on()
 
     def _read_klass(self, matrix) -> set:
         """
@@ -814,6 +815,12 @@ class Auditory(SafeClass):
         Seat.counters["total"] -= self.capacity
 
     def refresh(self, new_settings):
+        old_status = self.settings["available"]
+        print(old_status, new_settings["available"])
+        if not old_status and new_settings["available"]:
+            self.switch_on()
+        if old_status and not new_settings["available"]:
+            self.switch_off()
         self.settings.update(new_settings)
         self._init_settings_from_dict(self.settings)
 
