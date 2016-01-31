@@ -12,6 +12,7 @@ class Settings(tk.Toplevel):
 
     def __init__(self, master, items, *args, **kwargs):
         tk.Toplevel.__init__(self, master=master, *args, **kwargs)
+        self.wm_title("Настройки")
         self.geometry("+500+300")
         self.items = {item.inner_name: item for item in items}
         self.buttons_lay = dict()
@@ -40,7 +41,7 @@ class Settings(tk.Toplevel):
                                                      justify="left",
                                                      font="Courier 7")
             self.buttons_lay["__label__"].grid(column=3, row=start_row)
-        self.buttons_lay["__commit__"] = tk.Button(self, text="Закончить настройку", command=_commit_action)
+        self.buttons_lay["__commit__"] = tk.Button(self, text="Сохранить", command=_commit_action)
         self.buttons_lay["__commit__"].grid(column=1, row=start_row, columnspan=2, sticky="we")
 
     def _check_buttons(self, start_row, item):
@@ -122,6 +123,7 @@ class RassadkaGUI(tk.Tk, TkTools):
 
     def __init__(self):
         tk.Tk.__init__(self)
+        self.wm_title("Рассадка v1.0")
         self.__SAVE_ON_EXIT = tk.BooleanVar(self, value=True)
         self.geometry(self.__GUI_GEOM)
         self.label = tk.Label(self, text="Tap anywhere to refresh info",
@@ -162,12 +164,12 @@ class RassadkaGUI(tk.Tk, TkTools):
                                                                item=self.controller.maps_with_status_to_excel,
                                                                filetypes=(('Excel files', '.xlsx'), ))}
         commands["Выгрузки"]["Аудитории..."] = oDict()
-        commands["Выгрузки"]["Аудитории..."]["..в txt"] = {"command": self.save(parent=self,
-                                                           item=self.controller.summary_to_txt,
-                                                           filetypes=(("txt files", ".txt"), ))}
-        commands["Выгрузки"]["Аудитории..."]["..в Excel"] = {"command": self.save(parent=self,
-                                                             item=self.controller.summary_to_excel,
-                                                             filetypes=(("Excel files", ".xlsx"), ))}
+        commands["Выгрузки"]["Аудитории..."]["в txt"] = {"command": self.save(parent=self,
+                                                         item=self.controller.summary_to_txt,
+                                                         filetypes=(("txt files", ".txt"), ))}
+        commands["Выгрузки"]["Аудитории..."]["в Excel"] = {"command": self.save(parent=self,
+                                                           item=self.controller.summary_to_excel,
+                                                           filetypes=(("Excel files", ".xlsx"), ))}
         commands["Волшебство"]["Рассадить"] = {"command": self.controller.place_loaded_people}
         commands["Волшебство"]["Закрепить на ключ"] = {"command": self.key_usage(func=
                                                                                  self.controller.lock_seated_on_key)}
@@ -175,11 +177,16 @@ class RassadkaGUI(tk.Tk, TkTools):
                                                                                   self.controller.unlock_seated_by_key)}
         commands["Волшебство"]["Отметка о прибытии"] = {"command": self.controller.mark_arrival_by_email}
         commands["Волшебство"]["Удалить..."] = oDict()
-        commands["Волшебство"]["Удалить..."]["..по местам"] = {"command": self.controller.remove_seated_by_coords}
-        commands["Волшебство"]["Удалить..."]["..по Email"] = {"command": self.controller.remove_seated_by_email}
+        commands["Волшебство"]["Удалить..."]["по местам"] = {"command": self.controller.remove_seated_by_coords}
+        commands["Волшебство"]["Удалить..."]["по Email"] = {"command": self.controller.remove_seated_by_email}
         commands["Волшебство"]["Опасно"] = oDict()
         commands["Волшебство"]["Опасно"]["Удалить всех"] = {"command": self.controller.clean_seated}
-        commands["Волшебство"]["Опасно"]["Обновить по местам"] = {"command":
+        commands["Волшебство"]["Опасно"]["Обновить"] = oDict()
+        commands["Волшебство"]["Опасно"]["Обновить"]["по email"] = {"command":
+                                            self.yes_no(lambda event: self.controller.update_seated_by_email(True),
+                                                        lambda event: self.controller.update_seated_by_email(False),
+                                                        label="Игнорировать ли блокировку?")}
+        commands["Волшебство"]["Опасно"]["Обновить"]["по местам"] = {"command":
                                             self.yes_no(lambda event: self.controller.update_seated_by_coords(True),
                                                         lambda event: self.controller.update_seated_by_coords(False),
                                                         label="Игнорировать ли блокировку?")}
@@ -263,19 +270,19 @@ class RassadkaGUI(tk.Tk, TkTools):
             pop_up = tk.Toplevel(self)
             pop_up.geometry(self.__POP_POS)
             pop_up.label = tk.Label(pop_up, text=label)
-            pop_up.label.pack(side="top")
+            pop_up.label.grid(row=0, column=0, columnspan=2)
             yes = tk.Button(pop_up, text="Да", command=pop_up.destroy)
             no = tk.Button(pop_up, text="Нет", command=pop_up.destroy)
             no.bind("<Button-1>", no_event, add="+")
             yes.bind("<Button-1>", yes_event, add="+")
             no.bind("<Button-1>", self.upd, add="+")
             yes.bind("<Button-1>", self.upd, add="+")
-            yes.pack(side="left")
-            no.pack(side="right")
+            yes.grid(row=1, column=0, sticky="we")
+            no.grid(row=1, column=1, sticky="we")
         return wrapper
 
     def report_callback_exception(self, exc, val, tb):
-        showerror("Ошибка", message=str(val))
+        showerror("Ошибка", message=str(exc) + "\n" + str(val))
 
 
 if __name__ == '__main__':

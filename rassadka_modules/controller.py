@@ -306,7 +306,7 @@ class Controller(SafeClass):
         Необходимо иметь обычную допустимую входную загрузку
         :param bool forced: менять ли людей на местах, которые заблокированы?
         """
-        if "insert" not in self.mode["people"].split("/"):     # Проверка уровня доступа
+        if "input" not in self.mode["people"].split("/"):     # Проверка уровня доступа
             raise ControllerException("PermissionError")
         for new_data in self.people.to_dict(orient="records"):
             for_insert = new_data.copy()
