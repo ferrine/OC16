@@ -54,7 +54,6 @@ class Controller(SafeClass):
             return
         self.email_handle = list()
         self.mode = {"people": "None"}
-        self.key_holder = set()
         self.last_change = None
         self.people = pd.DataFrame()
         self.auds = dict()
@@ -107,7 +106,7 @@ class Controller(SafeClass):
         :return:
         """
         if not available:
-            raise NoFreeAuditory
+            raise NoFreeAuditory("Нет свободных аудиторий")
         for_check = random.sample(available, 1)[0]
         available.remove(for_check)
         try:
@@ -123,7 +122,7 @@ class Controller(SafeClass):
         :return:
         """
         if not available:
-            raise NoFreeAuditory
+            raise NoFreeAuditory("Нет свободных аудиторий")
         for_check = random.sample(available, 1)[0]
         available.remove(for_check)
         try:
@@ -156,6 +155,11 @@ class Controller(SafeClass):
 
     @mutable
     def load_auditory(self, file):
+        """
+        Повторяющиеся загружены не будут
+        :param file:
+        :return:
+        """
         excel_file = ExcelFile(file)
         for name in excel_file.sheet_names:
             raw_frame = excel_file.parse(name, index_col=None, header=None)
@@ -164,7 +168,6 @@ class Controller(SafeClass):
                 tmp = Auditory(unresolved_dict, outer_name=name)
                 if tmp.inner_name in self.auds.keys():
                     del tmp
-                    warnings.warn("Аудитории с одинаковыми названиями не загружены")
                 else:
                     self.auds[tmp.inner_name] = tmp
 
@@ -240,6 +243,31 @@ class Controller(SafeClass):
             aud.clean_all()
 
     @mutable
+    def lock_seated_on_key_by_email(self, key: str):
+        """
+        Блокироует участников по ключу.
+        Это позволяет получать определенного
+        рода спокойствие за исполняемые опасные
+        действия над рассаженными участниками
+        :param key: Ключ
+        :return:
+        """
+        if not key:
+            raise ControllerException(key)
+        for email in self.email_handle:
+            coords = self.coords_by_email(email)
+            self.auds[coords["aud"]].lock_by_coords((coords["row"], coords["col"]), key)
+
+    @mutable
+    def unlock_seated_by_email(self):
+        """
+        Разблокировывает участников по email игнорирует ключи
+        """
+        for email in self.email_handle:
+            coords = self.coords_by_email(email)
+            self.auds[coords["aud"]].unlock_by_coords((coords["row"], coords["col"]))
+
+    @mutable
     def lock_seated_on_key(self, key: str):
         """
         Блокироует участников по ключу.
@@ -253,7 +281,6 @@ class Controller(SafeClass):
             raise ControllerException(key)
         for aud in self.auds.values():
             aud.lock_all(key)
-        self.key_holder.add(key)
 
     @mutable
     def unlock_seated_by_key(self, key):
@@ -265,7 +292,6 @@ class Controller(SafeClass):
         if key in self.key_holder:
             for aud in self.auds.values():
                 aud.unlock_all(key)
-            self.key_holder.remove(key)
         else:
             raise ControllerException("Key Error %s" % key)
 
@@ -280,7 +306,6 @@ class Controller(SafeClass):
             try:
                 seat = self.coords_by_email(email)
                 self.auds[str(seat["aud"])].mark_arrival_by_coords((seat["row"], seat["col"]))
-                self.key_holder.add("arrival")
             except KeyError:
                 continue
 
@@ -368,18 +393,10 @@ class Controller(SafeClass):
                 message = message.format(len(set(self.people["email"]) & set(self.seated_people["email"])))
                 raise ControllerException(message)
         random.seed(self.seed)
-        try:
-            for team in self.teams:
-                self.rand_aud_insert_team(team)
-            for individual in self.inds:
-                self.rand_aud_insert(individual)
-        except NoFreeAuditory:
-            self.clean_seated()
-            if self.seed <= self.max_iter:
-                self.seed += 1
-                self.place_loaded_people()
-            else:
-                raise NoFreeAuditory("{0} итераций были безуспешны, слишком мало аудиторий".format(self.max_iter))
+        for team in self.teams:
+            self.rand_aud_insert_team(team)
+        for individual in self.inds:
+            self.rand_aud_insert(individual)
 
     @property
     def seated_people(self) -> pd.DataFrame:
@@ -391,6 +408,35 @@ class Controller(SafeClass):
                 seated.extend(aud.get_all_seated())
         frame = pd.DataFrame.from_dict(seated)
         return frame
+
+    def comparison(self):
+        if not len(self.people) or not len(self.seated_people):
+            raise ControllerException("Нету людей для сравнения")
+        other = self.people.set_index("email", drop=False)
+        seated = self.seated_people.set_index("email", drop=False)
+        emails = set(seated.index.tolist()) & set(other.index.tolist())
+        not_seated = set(other.index.tolist()) - set(seated.index.tolist())
+        result = {"there": list(), "here": list()}
+        for email in emails:
+            here = seated.loc[email].to_dict()
+            there = other.loc[email].to_dict()
+            for key in self.required_data_cols.keys():
+                if clr(here[key]) != clr(there[key]):
+                    result["there"].append(there)
+                    result["here"].append(here)
+                    break
+        return {"here": pd.DataFrame.from_records(result["here"]).rename(columns=self._default_full_dict),
+                "there": pd.DataFrame.from_records(result["there"]).rename(columns=self._default_full_dict),
+                "not_seated": other.loc[not_seated].rename(columns=self._default_full_dict)}
+
+    @property
+    def not_seated(self):
+        if not len(self.people) or not len(self.seated_people):
+            raise ControllerException("Нету людей для сравнения")
+        other = self.people.set_index("email", drop=False)
+        seated = self.seated_people.set_index("email", drop=False)
+        emails = set(other.index.tolist()) - set(seated.index.tolist())
+        return other.loc[emails]
 
     def summary_to_txt(self, file):
         message = ""
@@ -504,6 +550,10 @@ class Controller(SafeClass):
                          ("seats_meta", Seat.counters),
                          ("controller", self)])
         pickle.dump(prepared, file)
+
+    @property
+    def key_holder(self):
+        return np.unique(reduce(list.__add__, [aud.keys for aud in self.auds.values()], []))
 
     @property
     def info(self):

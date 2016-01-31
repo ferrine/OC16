@@ -13,7 +13,7 @@ class ControllerException(Exception):
     def message(self):
         return self.info
 
-    def __init__(self, message, **kwargs):
+    def __init__(self, message="", **kwargs):
         super().__init__(**kwargs)
         self.info = message
 

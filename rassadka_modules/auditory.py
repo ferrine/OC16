@@ -113,8 +113,11 @@ class Seat:
             self.locked = True
             self.lock_key = key
 
-    def unlock(self, key):
-        if self.locked and key == self.lock_key:
+    def unlock(self, key=None, forced=False):
+        if not key and forced:
+            self.locked = False
+            self.lock_key = None
+        elif self.locked and key == self.lock_key:
             self.locked = False
             self.lock_key = None
 
@@ -228,8 +231,14 @@ class Mapping:
     def lock(self, yx, key):
         self.m[yx].lock(key)
 
-    def unlock(self, yx, key):
-        self.m[yx].unlock(key)
+    def unlock(self, yx, key=None, forced=False):
+        self.m[yx].unlock(key, forced)
+
+    def lock_by_coords(self, coords, key):
+        self.lock(self.coords_to_yx[coords], key)
+
+    def unlock_by_coords(self, coords):
+        self.unlock(self.coords_to_yx[coords], forced=True)
 
     def update_by_coords(self, coords, new_data, forced=False):
         if self.m[self.coords_to_yx[coords]]:

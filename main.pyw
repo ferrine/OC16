@@ -6,7 +6,7 @@ from collections import OrderedDict as oDict
 from rassadka_modules.controller import Controller
 from rassadka_modules.tktools import TkTools
 from tkinter.messagebox import showerror
-
+import traceback
 
 class Settings(tk.Toplevel):
 
@@ -92,6 +92,34 @@ class Settings(tk.Toplevel):
         self.row = start_row + row
 
 
+class Compare(tk.Toplevel):
+    def __init__(self, master, data, *args, **kwargs):
+        tk.Toplevel.__init__(self, master=master, *args, **kwargs)
+        self.wm_title("Сравнение")
+        self.geometry("+500+300")
+        self.info = tk.Label(self, text="Найдено несовпадений {}".format(len(data["here"])),
+                             justify="left",
+                             font="Courier 10")
+        self.info.grid(row=0, column=0, columnspan=2)
+
+        def save(where):
+            path = filedialog.SaveAs(self, filetypes=(('Excel files', '.xlsx'),)).show()
+            if not path:
+                return
+            if not path.endswith(".xlsx"):
+                path += ".xlsx"
+            data[where].to_excel(path)
+
+        self.d_there = tk.Button(self, text="Выгрузить загруженных\n(несовпадения) [%s]" % len(data["there"]),
+                                 command=lambda: save("there"))
+        self.d_here = tk.Button(self, text="Выгрузить сидящих\n(несовпадения) [%s]" % len(data["here"]),
+                                command=lambda: save("here"))
+        self.d_nor = tk.Button(self, text="Выгрузить не сидящих [%s]" % len(data["not_seated"]), command=lambda: save("not_seated"))
+        self.d_there.grid(row=1, column=0)
+        self.d_here.grid(row=1, column=1)
+        self.d_nor.grid(row=2, column=0, columnspan=2, sticky="we")
+
+
 class RassadkaGUI(tk.Tk, TkTools):
     __SIZE = (500, 250, 500, 250)
     __GUI_GEOM = "%dx%d+%d+%d" % __SIZE
@@ -149,6 +177,7 @@ class RassadkaGUI(tk.Tk, TkTools):
                                                     self.load(parent=self, item=self.controller.load_emails)}
         commands["Загрузки"]["Очистить загруженных"] = {"command": self.controller.clear_buffer}
         commands["Загрузки"]["Добавить аудиторию"] = {"command": self.load(self, self.controller.load_auditory)}
+        commands["Выгрузки"]["Сравнение"] = {"command": lambda: Compare(self, self.controller.comparison())}
         commands["Выгрузки"]["На стенд"] = {"command": self.save(parent=self, item=self.controller.seated_to_excel,
                                             for_item=dict(full=False))}
         commands["Выгрузки"]["Полная выгрузка"] = {"command":
@@ -171,16 +200,23 @@ class RassadkaGUI(tk.Tk, TkTools):
                                                            item=self.controller.summary_to_excel,
                                                            filetypes=(("Excel files", ".xlsx"), ))}
         commands["Волшебство"]["Рассадить"] = {"command": self.controller.place_loaded_people}
-        commands["Волшебство"]["Закрепить на ключ"] = {"command": self.key_usage(func=
-                                                                                 self.controller.lock_seated_on_key)}
-        commands["Волшебство"]["Открепить по ключу"] = {"command": self.key_usage(func=
-                                                                                  self.controller.unlock_seated_by_key)}
+        commands["Волшебство"]["Закрепить на ключ"] = oDict()
+        commands["Волшебство"]["Закрепить на ключ"]["всех"] = {"command": self.key_usage(func=
+                                                               self.controller.lock_seated_on_key)}
+        commands["Волшебство"]["Закрепить на ключ"]["по email"] = {"command": self.key_usage(func=
+                                                                   self.controller.lock_seated_on_key_by_email)}
+
+        commands["Волшебство"]["Открепить от ключа"] = oDict()
+        commands["Волшебство"]["Открепить от ключа"]["по ключу"] = {"command": self.key_usage(func=
+                                                                    self.controller.unlock_seated_by_key)}
+        commands["Волшебство"]["Открепить от ключа"]["по email"] = {"command": self.controller.unlock_seated_by_email}
+
         commands["Волшебство"]["Отметка о прибытии"] = {"command": self.controller.mark_arrival_by_email}
         commands["Волшебство"]["Удалить..."] = oDict()
         commands["Волшебство"]["Удалить..."]["по местам"] = {"command": self.controller.remove_seated_by_coords}
-        commands["Волшебство"]["Удалить..."]["по Email"] = {"command": self.controller.remove_seated_by_email}
+        commands["Волшебство"]["Удалить..."]["по email"] = {"command": self.controller.remove_seated_by_email}
+        commands["Волшебство"]["Удалить..."]["всех"] = {"command": self.controller.clean_seated}
         commands["Волшебство"]["Опасно"] = oDict()
-        commands["Волшебство"]["Опасно"]["Удалить всех"] = {"command": self.controller.clean_seated}
         commands["Волшебство"]["Опасно"]["Обновить"] = oDict()
         commands["Волшебство"]["Опасно"]["Обновить"]["по email"] = {"command":
                                             self.yes_no(lambda event: self.controller.update_seated_by_email(True),
@@ -252,13 +288,16 @@ class RassadkaGUI(tk.Tk, TkTools):
             pop_up = tk.Toplevel(self)
             pop_up.geometry(self.__POP_POS)
             tk.Label(pop_up, text=label).grid(column=0, row=0, sticky="e")
-            inp = tk.Entry(pop_up, width=16)
-            inp.grid(column=1, row=0)
 
             def ok(event):
                 user_input = inp.get()
                 func(user_input)
 
+            inp = tk.Entry(pop_up, width=16)
+            inp.bind("<Return>", ok, add="+")
+            inp.bind("<Return>", lambda ev: pop_up.destroy(), add="+")
+            inp.bind("<Return>", self.upd, add="+")
+            inp.grid(column=1, row=0)
             button = tk.Button(pop_up, text="OK", command=pop_up.destroy)
             button.bind("<Button-1>", ok, add="+")
             button.bind("<Button-1>", self.upd, add="+")
@@ -281,8 +320,13 @@ class RassadkaGUI(tk.Tk, TkTools):
             no.grid(row=1, column=1, sticky="we")
         return wrapper
 
-    def report_callback_exception(self, exc, val, tb):
-        showerror("Ошибка", message=str(exc) + "\n" + str(val))
+    def report_callback_exception(self, exc=None, val=None, tb=None):
+        if Checker.settings.get("debug_mode"):
+            file = open("debug.txt", "w")
+            traceback.print_exception(exc, val, tb, file=file)
+            showerror("Ошибка", message="См ошибку в файле debug.txt")
+        else:
+            showerror("Ошибка", message=str(exc) + "\n" + str(val))
 
 
 if __name__ == '__main__':
