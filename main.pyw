@@ -1,8 +1,9 @@
 import os
 import tkinter as tk
 from tkinter import filedialog
-from rassadka_modules.check_system import Checker
 from collections import OrderedDict as oDict
+from rassadka_modules.rassadka_exceptions import ControllerException
+from rassadka_modules.check_system import Checker
 from rassadka_modules.controller import Controller
 from rassadka_modules.tktools import TkTools
 from tkinter.messagebox import showerror
@@ -149,6 +150,14 @@ class RassadkaGUI(tk.Tk, TkTools):
     if not os.path.exists(__DEFAULT_APP_PATH):
         os.mkdir(__DEFAULT_APP_PATH)
 
+    def report_callback_exception(self, exc=None, val=None, tb=None):
+        if Checker.settings.get("debug_mode", False):
+            file = open("debug.txt", "w")
+            traceback.print_exception(exc, val, tb, file=file)
+            showerror("Ошибка", message="См ошибку в файле debug.txt")
+        else:
+            showerror("Ошибка", message=str(exc) + "\n" + str(val))
+
     def _load_controller(self):
         try:
             file = open(self.__DEFAULT_APP_PATH + self.__CONTROLLER_FILENAME, "rb")
@@ -180,7 +189,11 @@ class RassadkaGUI(tk.Tk, TkTools):
         self.label.grid(row=1, column=0, sticky="w")
         self.pack_propagate(1)
         self.infovar = tk.StringVar(self)
-        self._load_controller()
+        try:
+            self._load_controller()
+        except ControllerException as exc:
+            showerror("Ошибка", message=str(type(exc)) + "\n" + str(exc))
+            raise
         self.protocol("WM_DELETE_WINDOW", self.on_exit)
         self.info = tk.Label(self, textvariable=self.infovar,
                              justify="left",
@@ -246,8 +259,8 @@ class RassadkaGUI(tk.Tk, TkTools):
                                             self.yes_no(lambda event: self.controller.update_seated_by_coords(True),
                                                         lambda event: self.controller.update_seated_by_coords(False),
                                                         label="Игнорировать ли блокировку?")}
-        commands["Волшебство"]["Опасно"]["Очень опасно"] = oDict()    
-        commands["Волшебство"]["Опасно"]["Очень опасно"]["Удалить загрузочный файл"] = { 
+        commands["Волшебство"]["Опасно"]["Очень опасно"] = oDict()
+        commands["Волшебство"]["Опасно"]["Очень опасно"]["Удалить загрузочный файл"] = {
             "command": lambda: self.__SAVE_ON_EXIT.set(False),
             "background": "red"
         }
@@ -339,14 +352,6 @@ class RassadkaGUI(tk.Tk, TkTools):
             yes.grid(row=1, column=0, sticky="we")
             no.grid(row=1, column=1, sticky="we")
         return wrapper
-
-    def report_callback_exception(self, exc=None, val=None, tb=None):
-        if Checker.settings.get("debug_mode"):
-            file = open("debug.txt", "w")
-            traceback.print_exception(exc, val, tb, file=file)
-            showerror("Ошибка", message="См ошибку в файле debug.txt")
-        else:
-            showerror("Ошибка", message=str(exc) + "\n" + str(val))
 
 
 if __name__ == '__main__':

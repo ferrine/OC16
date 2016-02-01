@@ -108,9 +108,13 @@ class Seat:
             self._minus_arrived()
         self.data = dict()
 
-    def lock(self, key):
-        if self.data and not self.locked:
+    def lock(self, key, change=False):
+        if not self.data:
+            return
+        if not self.locked:
             self.locked = True
+            self.lock_key = key
+        elif change:
             self.lock_key = key
 
     def unlock(self, key=None, forced=False):
@@ -634,23 +638,20 @@ class Auditory(SafeClass):
         self.checker = Checker()
         self.team_handler = set()
         self.outer_name = outer_name
-        try:
-            if not self._check_settings(fact=set(raw_settings.keys()),
-                                        req=self._required_general_options):
-                raise NotEnoughSettings(fact=set(raw_settings.keys()),
-                                        req=self._required_general_options,
-                                        name="Проверка основных тегов на листе",
-                                        aud=self.outer_name)
-            self._init_settings(raw_settings["settings"])
-            klass_yx = self._read_klass(raw_settings["klass"])
-            school_yx = self._read_school(raw_settings["school"])
-            self._init_seats(raw_settings["seats"])
-            self.klass_school_town_dyx = self._eval_map_conditions(school=school_yx, klass=klass_yx)
-            if self.settings["available"]:
-                Seat.counters["total"] += self.capacity
-        except UserErrorException as e:
-            e.log_error()
-            raise e
+
+        if not self._check_settings(fact=set(raw_settings.keys()),
+                                    req=self._required_general_options):
+            raise NotEnoughSettings(fact=set(raw_settings.keys()),
+                                    req=self._required_general_options,
+                                    name="Проверка основных тегов на листе",
+                                    aud=self.outer_name)
+        self._init_settings(raw_settings["settings"])
+        klass_yx = self._read_klass(raw_settings["klass"])
+        school_yx = self._read_school(raw_settings["school"])
+        self._init_seats(raw_settings["seats"])
+        self.klass_school_town_dyx = self._eval_map_conditions(school=school_yx, klass=klass_yx)
+        if self.settings["available"]:
+            Seat.counters["total"] += self.capacity
 
     def _rand_loop_insert(self, data, available):
         """
