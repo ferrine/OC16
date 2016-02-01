@@ -379,7 +379,8 @@ class Auditory(SafeClass):
     _required_general_options = {"settings", "seats", "klass", "school"}
 
     _required_settings_options = {"name", "available", "class_8", "class_9",
-                                  "class_10", "class_11", "individual", "command"}
+                                  "class_10", "class_11", "individual", "command",
+                                  "over_place", "over_row"}
 
     _required_klass_values = {"far": 'Далеко', "close": 'Рядом', "target": 'Участник'}
 
@@ -404,7 +405,9 @@ class Auditory(SafeClass):
                                            "class_10": Ch(lambda x: x in {1, 0}, "in {0, 1}"),
                                            "class_11": Ch(lambda x: x in {1, 0}, "in {0, 1}"),
                                            "individual": Ch(lambda x: x in {1, 0}, "in {0, 1}"),
-                                           "command": Ch(lambda x: x in {1, 0}, "in {0, 1}")}
+                                           "command": Ch(lambda x: x in {1, 0}, "in {0, 1}"),
+                                           "over_place": Ch(lambda x: x in {1, 2}, "in {1, 2}"),
+                                           "over_row": Ch(lambda x: x in {1, 2, 3}, "in {1, 2, 3}")}
 
     _required_klass_shape = (7, 7)
 
@@ -412,25 +415,25 @@ class Auditory(SafeClass):
 
     _required_seats_shape = None
 
-    _required_settings_shape = (9, 4)
+    _required_settings_shape = (11, 4)
 
     def _create_paths(self):
         self.old_capacity = self.map.capacity
-        if self.checker.settings["over_row"] != 1:
+        if self.settings["over_row"] != 1:
             trigger = 1
             for row in range(self.map.shape[0]):
                 if any([seat.status for seat in self.map[row, :]]):
-                    if trigger % self.checker.settings["over_row"] == 0:
+                    if trigger % self.settings["over_row"] == 0:
                         for seat in range(self.map.shape[1]):
                             self.map.switch_off_by_yx((row, seat))
                     trigger += 1
                 else:
                     trigger = 1
-        if self.checker.settings["over_place"] != 1:
+        if self.settings["over_place"] != 1:
             trigger = 1
             for seat in range(self.map.shape[1]):
                 if any([seat.status for seat in self.map[:, seat]]):
-                    if trigger % self.checker.settings["over_place"] == 0:
+                    if trigger % self.settings["over_place"] == 0:
                         for row in range(self.map.shape[0]):
                             self.map.switch_off_by_yx((row, seat))
                     trigger += 1

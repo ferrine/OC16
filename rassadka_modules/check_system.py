@@ -25,9 +25,9 @@ class Checker(SafeClass):
 
     _required_general_options = {"main_settings"}
 
-    _required_settings_shape = (14, 4)
+    _required_settings_shape = (12, 4)
 
-    _required_settings_options = {"over_place", "over_row", "cl8_9",
+    _required_settings_options = {"cl8_9",
                                   "cl8_10", "cl8_11", "cl9_10",
                                   "cl9_11", "cl10_11", "one_school",
                                   "one_town", "com_in_one", "max_compart",
@@ -39,9 +39,7 @@ class Checker(SafeClass):
 
     _standard_settings_column_names = ["key", "description", "code", "result"]
 
-    _required_settings_values_condition = {"over_place": Ch(lambda x: x in {1, 2}, "in {1, 2}"),
-                                           "over_row": Ch(lambda x: x in {1, 2, 3}, "in {1, 2, 3}"),
-                                           "cl8_9": Ch(lambda x: x in {1, 0}, "in {0, 1}"),
+    _required_settings_values_condition = {"cl8_9": Ch(lambda x: x in {1, 0}, "in {0, 1}"),
                                            "cl8_10": Ch(lambda x: x in {1, 0}, "in {0, 1}"),
                                            "cl8_11": Ch(lambda x: x in {1, 0}, "in {0, 1}"),
                                            "cl9_10": Ch(lambda x: x in {1, 0}, "in {0, 1}"),
@@ -153,5 +151,5 @@ class Checker(SafeClass):
 
     @classmethod
     def refresh(cls, new_settings):
-        cls.settings = new_settings
+        cls.settings.update(new_settings)
         cls._eval_klass_conditions()

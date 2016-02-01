@@ -8,18 +8,38 @@ from rassadka_modules.tktools import TkTools
 from tkinter.messagebox import showerror
 import traceback
 
+
 class Settings(tk.Toplevel):
 
     def __init__(self, master, items, *args, **kwargs):
         tk.Toplevel.__init__(self, master=master, *args, **kwargs)
         self.wm_title("Настройки")
         self.geometry("+500+300")
-        self.items = {item.inner_name: item for item in items}
+        self.items = oDict([(item.inner_name, item) for item in items])
+        self.list_of_names = list(self.items.keys())
+        self.i = 0
         self.buttons_lay = dict()
-        self.current = tk.StringVar(self, "None")
+        self.current = tk.StringVar(self, self.list_of_names[0])
         self.select_menu = tk.OptionMenu(self, self.current, *[item.inner_name for item in items],
                                          command=self._make_layout)
         self.select_menu.grid(row=0, column=0, columnspan=2, sticky="we")
+        self._make_layout(self.current.get())
+        self.bind("<Left>", self._left)
+        self.bind("<Right>", self._right)
+        self.bind("<Up>", self._left)
+        self.bind("<Down>", self._right)
+
+    def _right(self, event):
+        if self.i < len(self.list_of_names) - 1:
+            self.i += 1
+        self.current.set(self.list_of_names[self.i])
+        self._make_layout(self.list_of_names[self.i])
+
+    def _left(self, event):
+        if self.i > 0:
+            self.i -= 1
+        self.current.set(self.list_of_names[self.i])
+        self._make_layout(self.list_of_names[self.i])
 
     def _make_layout(self, name):
         for widget in self.buttons_lay.values():
