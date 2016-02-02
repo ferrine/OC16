@@ -273,7 +273,7 @@
 
 ![img1](https://raw.githubusercontent.com/Ferrine/OC16/master/img/set_aud.png)
 
-![img1](https://raw.githubusercontent.com/Ferrine/OC16/master/img/set_choice.png)
+![img1](https://github.com/Ferrine/OC16/blob/master/img/set_choice.png)
 ### Расшифровка обозначений:
 **Аудитории**
 
