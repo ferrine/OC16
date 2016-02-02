@@ -13,7 +13,7 @@
 * Рассадка, досадка, изъятие участников, обновление их информации
   
 # Инструкции
-Подробно в `MANUAL.md`
+Подробно в [MANUAL.md](https://github.com/Ferrine/OC16/blob/master/MANUAL.md)
 
 # Bonus
 ## splitter.py
