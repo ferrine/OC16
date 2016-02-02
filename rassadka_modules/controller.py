@@ -22,7 +22,7 @@ class Controller(SafeClass):
                                 ("klass", "Класс")])
     _default_full_dict = required_data_cols.copy()
     _default_full_dict.update([("aud", "Ауд."), ("row", "Ряд"),
-                               ("col", "Место"), ("arrived", "Отметка о прибытии")])
+                               ("col", "Место"), ("arrived", "Отметка о прибытии"), ("key", "Ключ")])
     _mini_out = ["fam", "name", "otch", "aud", "row", "col"]
     _razdatka_cols = ["fam", "name", "otch", "row", "col", "Пришел?"]
     max_iter = 20
@@ -253,7 +253,9 @@ class Controller(SafeClass):
         :return:
         """
         if not key:
-            raise ControllerException(key)
+            raise ControllerException("Некорректный ключ")
+        if not self.email_handle:
+            raise ControllerException("Список email-ов пуст")
         for email in self.email_handle:
             coords = self.coords_by_email(email)
             self.auds[coords["aud"]].lock_by_coords((coords["row"], coords["col"]), key)
@@ -263,6 +265,8 @@ class Controller(SafeClass):
         """
         Разблокировывает участников по email игнорирует ключи
         """
+        if not self.email_handle:
+            raise ControllerException("Список email-ов пуст")
         for email in self.email_handle:
             coords = self.coords_by_email(email)
             self.auds[coords["aud"]].unlock_by_coords((coords["row"], coords["col"]))
@@ -300,7 +304,7 @@ class Controller(SafeClass):
         """
         Ставит отметку о прибытии для участников, чьи email подгружены
         """
-        if not bool(self.email_handle):
+        if not self.email_handle:
             raise ControllerException("Список email-ов пуст")
         for email in self.email_handle:
             try:

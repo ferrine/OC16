@@ -152,8 +152,7 @@ class RassadkaGUI(tk.Tk, TkTools):
 
     def report_callback_exception(self, exc=None, val=None, tb=None):
         if Checker.settings.get("debug_mode", False):
-            file = open("debug.txt", "w")
-            traceback.print_exception(exc, val, tb, file=file)
+            traceback.print_exception(exc, val, tb, file=open("debug.txt", "w"))
             showerror("Ошибка", message="См ошибку в файле debug.txt")
         else:
             showerror("Ошибка", message=str(exc) + "\n" + str(val))
@@ -208,8 +207,8 @@ class RassadkaGUI(tk.Tk, TkTools):
                                                         self.load(parent=self, item=self.controller.load_people)}
         commands["Загрузки"]["Загрузить Emails"] = {"command":
                                                     self.load(parent=self, item=self.controller.load_emails)}
-        commands["Загрузки"]["Очистить загруженных"] = {"command": self.controller.clear_buffer}
         commands["Загрузки"]["Добавить аудиторию"] = {"command": self.load(self, self.controller.load_auditory)}
+        commands["Загрузки"]["Очистить загруженных"] = {"command": self.controller.clear_buffer}
         commands["Выгрузки"]["Сравнение"] = {"command": lambda: Compare(self, self.controller.comparison())}
         commands["Выгрузки"]["На стенд"] = {"command": self.save(parent=self, item=self.controller.seated_to_excel,
                                             for_item=dict(full=False))}

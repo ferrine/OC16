@@ -157,6 +157,7 @@ class Seat:
             res = self.data.copy()
             res["aud"] = self.aud
             res["row"], res["col"] = self.yx
+            res["key"] = self.lock_key
             return res
 
 
