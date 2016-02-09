@@ -8,11 +8,11 @@ from rassadka_modules.common import Ch
 
 
 class Checker(SafeClass):
-    CHECK = ["cl8_9", "cl8_10", "cl8_11", "cl9_10",
+    CHECK = ["cl8_9", "cl8_10", "cl8_11", "cl9_10",  # Для виджета
              "cl9_11", "cl10_11", "one_school",
              "one_town", "com_in_one",
              "debug_mode"]
-    # RADIO = [{"name": "over_place", "states": (1, 2)}, {"name": "over_row", "states": (1, 2, 3)}]
+
     SCALE = [{"name": "max_compart", "var": (0, 1)}]
 
     def __setattr__(self, key, value):
