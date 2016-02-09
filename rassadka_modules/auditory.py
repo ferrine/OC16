@@ -771,7 +771,7 @@ class Auditory(SafeClass):
         if not self.map.capacity > 0:
             raise EndLoopException
         # поместится ли команда?
-        if self.checker.settings["max_compart"] < (self.map.counter + len(team)) / self.map.capacity:
+        if self.checker.settings["max_compart"] < (self.map.counter + len(team)) / self.old_capacity:
             raise EndLoopException
         # Дальнейшик проверки для простоты находятся во вспомогательной функции
         self.team_handler = set()
