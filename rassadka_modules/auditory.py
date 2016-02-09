@@ -23,6 +23,8 @@ class Seat:
         self.status = bool(status)
         self.meta_status = status
         self.data = data if data else dict()
+        if self.status:
+            self._plus_total()
 
     def __bool__(self):             # Тут кто-то сидит?
         return bool(self.data)
@@ -637,8 +639,8 @@ class Auditory(SafeClass):
         school_yx = self._read_school(raw_settings["school"])
         self._init_seats(raw_settings["seats"])
         self.klass_school_town_dyx = self._eval_map_conditions(school=school_yx, klass=klass_yx)
-        if self.settings["available"]:
-            Seat.counters["total"] += self.capacity
+        if not self.settings["available"]:
+            Seat.counters["total"] -= self.map.capacity
 
     def _rand_loop_insert(self, data, available):
         """
