@@ -21,6 +21,7 @@ class Seat:
         self.aud = audname
         self.yx = yx
         self.status = bool(status)
+        self.meta_status = status
         self.data = data if data else dict()
 
     def __bool__(self):             # Тут кто-то сидит?
@@ -172,24 +173,24 @@ class Mapping:
         where = object.__getattribute__(self, "m")
         return getattr(where, item)
 
-    def __init__(self, boolmatrix, inner_name):
+    def __init__(self, meta_status_matrix, inner_name):
         self.counter = 0
         self.inner_name = inner_name
         self.available_seats = set()
         self.capacity = 0
         self.coords_to_yx = dict()
-        res = np.zeros(boolmatrix.shape, dtype=object)
-        rows = np.apply_along_axis(lambda row: np.any(row), 1, boolmatrix).cumsum()
-        seats = boolmatrix.cumsum(1)     # Получаем места в ряду реальные, накопленные слева направо
+        res = np.zeros(meta_status_matrix.shape, dtype=object)
+        rows = np.apply_along_axis(lambda row: np.any(row), 1, meta_status_matrix).cumsum()
+        seats = np.vectorize(bool)(meta_status_matrix).cumsum(1)     # Получаем места в ряду реальные, накопленные слева направо
         max_row = 0
         max_col = 0
-        for y in range(boolmatrix.shape[0]):
-            for x in range(boolmatrix.shape[1]):
+        for y in range(meta_status_matrix.shape[0]):
+            for x in range(meta_status_matrix.shape[1]):
                 coords = (int(rows[y]), int(seats[y, x]))
                 res[y, x] = Seat(yx=coords,
-                                 status=boolmatrix[y, x],
+                                 status=meta_status_matrix[y, x],
                                  audname=self.inner_name)
-                if boolmatrix[y, x]:
+                if meta_status_matrix[y, x]:
                     self.coords_to_yx[coords] = (y, x)
                     self._plus_capacity((y, x))
                     max_row = max(max_row, y)
@@ -391,7 +392,7 @@ class Auditory(SafeClass):
 
     _required_school_values = {"far": 'Далеко', "close": 'Рядом', "target": 'Участник'}
 
-    _required_seats_values = {"seat": 'Место', "not_allowed": 'Проход'}
+    _required_seats_values = {"seat": 'Место', 'fake_seat': 'Не Место', "not_allowed": 'Проход'}
 
     _standard_settings_column_names = ["key", "description", "code", "result"]
 
@@ -444,6 +445,10 @@ class Auditory(SafeClass):
                     trigger += 1
                 else:
                     trigger = 1
+        # тут убираются те места, которые мы исключили сами
+        for yx in product(range(self.map.shape[0]), range(self.map.shape[1])):
+            if self.map[yx].meta_status == 2:
+                self.map.switch_off_by_yx(yx)
 
     @staticmethod
     def _get_matrix_condition_places(matrix) -> set:
@@ -600,11 +605,12 @@ class Auditory(SafeClass):
                                     req=set(self._required_seats_values.values()),
                                     way="<="):      # Это может оказаться просто пустой лист, на который можно забить
             raise NotEnoughSettings(fact=set(key),
-                                    req=self._required_seats_values,
+                                    req=set(self._required_seats_values.values()),
                                     way="<=",
                                     aud=self.outer_name)
-        seats_map[seats_map == self._required_seats_values["seat"]] = True
-        seats_map[seats_map == self._required_seats_values["not_allowed"]] = False
+        seats_map[seats_map == self._required_seats_values["seat"]] = 1
+        seats_map[seats_map == self._required_seats_values["fake_seat"]] = 2
+        seats_map[seats_map == self._required_seats_values["not_allowed"]] = 0
         self.map = Mapping(seats_map, str(self.settings["name"]))
         self._create_paths()
 
