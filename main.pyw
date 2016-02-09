@@ -145,21 +145,22 @@ class RassadkaGUI(tk.Tk, TkTools):
     __SIZE = (500, 250, 500, 250)
     __GUI_GEOM = "%dx%d+%d+%d" % __SIZE
     __POP_POS = "+" + str(int(__SIZE[2] + 0.5 * __SIZE[0])) + "+" + str(int(__SIZE[3] + 0.5 * __SIZE[1]))
-    __CONTROLLER_FILENAME = "controller.pkl"
-    __DEFAULT_APP_PATH = os.environ.get("USERPROFILE") + "\\.rassadka\\"
+    __DEFAULT_APP_PATH = os.path.join(os.path.expanduser("~"), ".rassadka")
+    __CONTROLLER_FILE = os.path.join(__DEFAULT_APP_PATH, "controller.pkl")
+    __DEBUG_FILE = os.path.join(__DEFAULT_APP_PATH, "debug.txt")
     if not os.path.exists(__DEFAULT_APP_PATH):
         os.mkdir(__DEFAULT_APP_PATH)
 
     def report_callback_exception(self, exc=None, val=None, tb=None):
         if Checker.settings.get("debug_mode", False):
-            traceback.print_exception(exc, val, tb, file=open("debug.txt", "w"))
-            showerror("Ошибка", message="См ошибку в файле debug.txt")
+            traceback.print_exception(exc, val, tb, file=open(self.__DEBUG_FILE, "w"))
+            showerror("Ошибка", message="См ошибку в файле {}".format(self.__DEBUG_FILE))
         else:
             showerror("Ошибка", message=str(exc) + "\n" + str(val))
 
     def _load_controller(self):
         try:
-            file = open(self.__DEFAULT_APP_PATH + self.__CONTROLLER_FILENAME, "rb")
+            file = open(self.__CONTROLLER_FILE, "rb")
             self.controller = Controller(file, from_pickle=True)
         except FileNotFoundError:
             filename = filedialog.Open(self,
@@ -307,10 +308,10 @@ class RassadkaGUI(tk.Tk, TkTools):
 
     def on_exit(self):
         if self.__SAVE_ON_EXIT.get():
-            self.controller.to_pickle(open(self.__DEFAULT_APP_PATH + self.__CONTROLLER_FILENAME, "wb"))
+            self.controller.to_pickle(open(self.__CONTROLLER_FILE, "wb"))
         else:
             try:
-                os.remove(self.__DEFAULT_APP_PATH + self.__CONTROLLER_FILENAME)
+                os.remove(self.__CONTROLLER_FILE)
             except (NotImplementedError, FileNotFoundError):
                 pass
         self.destroy()
