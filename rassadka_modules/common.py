@@ -6,8 +6,7 @@ def mutable(method):
     """
     Фиксирует дату последнего изменения в переменной last_change
     Чтобы избежать ругательств IDE и читателя, рекомендуется
-    добавить в метод __init__ строку
-    self.last_change = None
+    добавить метод update
     :param method:
     :return:
     """
