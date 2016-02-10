@@ -27,21 +27,6 @@ class Controller(SafeClass):
     _razdatka_cols = ["fam", "name", "otch", "row", "col", "Пришел?"]
     max_iter = 20
 
-    def __str__(self):
-        message = """
-Последнее изменение {last_change}
-Режим -{mode}-
-Загружено(сидит) человек    {people:<5}({intersect_people})
-                 команд     {n_teams:<5}({intersect_teams})
-                 emails     {emails:<5}({intersect_emails})
-Доступно(всего)  аудиторий  {n_used_auds:<5}({n_auds})
-                 мест       {seats_available:<5}({seats_total})
-Посажено(пришло) человек    {seated:<5}({arrived})
-                 команд     {seated_teams:<5}({arrived_teams})
-Ключи {{ключ: количество}}
-    {keys}""".format(**self.info)
-        return message
-
     def __getitem__(self, item):
         return self.auds[item]
 
@@ -83,6 +68,7 @@ class Controller(SafeClass):
                     raise TypeError("Есть одинаковые аудитории")
                 else:
                     self.auds[tmp.inner_name] = tmp
+        self._message_upd()
 
     def coords_by_email(self, email) -> dict:
         """
@@ -209,7 +195,7 @@ class Controller(SafeClass):
                                     way=">=")
         people = people.rename(columns=swap(self._default_full_dict))
         if (any([item in people.columns for item in ["aud", "row", "col"]]) and
-           not all([item in people.columns for item in ["aud", "row", "col"]])):
+                not all([item in people.columns for item in ["aud", "row", "col"]])):
             raise ControllerException("Некорректно заданы столбцы с местами")
         # Присвоение уровня доступа
         if len(people) == 0:
@@ -409,7 +395,7 @@ class Controller(SafeClass):
         """
         seated = list()
         for aud in sorted(self.auds.values()):
-                seated.extend(aud.get_all_seated())
+            seated.extend(aud.get_all_seated())
         frame = pd.DataFrame.from_dict(seated)
         return frame
 
@@ -470,7 +456,7 @@ class Controller(SafeClass):
                 select = list(self._default_full_dict.keys())
             frame = self.seated_people
             frame.ix[:, select].sort_values("fam", ascending=True).rename(
-                    columns=self._default_full_dict).reset_index(drop=True).to_excel(writer, "На стенд")
+                columns=self._default_full_dict).reset_index(drop=True).to_excel(writer, "На стенд")
             sheet = writer.sheets["На стенд"]
             sheet.set_column("B:D", 15)
             sheet.repeat_rows(0)
@@ -535,8 +521,8 @@ class Controller(SafeClass):
         with pd.ExcelWriter(file) as writer:
             for aud in sorted(self.auds.values()):
                 aud.people_table.ix[:, self._razdatka_cols].sort_values("fam", ascending=True).rename(
-                        columns=self._default_full_dict).to_excel(
-                        writer, aud.inner_name, index=False)
+                    columns=self._default_full_dict).to_excel(
+                    writer, aud.inner_name, index=False)
                 sheet = writer.sheets[aud.inner_name]
                 sheet.set_column("A:C", 15)
                 sheet.repeat_rows(0)
@@ -592,3 +578,52 @@ class Controller(SafeClass):
         key, frequency = np.unique(all_keys, return_counts=True)
         info["keys"] = dict(zip(key, frequency))
         return info
+
+    def __str__(self):
+        return self._message
+
+    def update(self):
+        self.last_change = datetime.datetime.now().strftime("%A, %d. %B %Y %I:%M%p")
+        self._message_upd()
+
+    def _message_upd(self):
+        self._message = """
+Последнее изменение {last_change}
+Режим -{mode}-
+Загружено(сидит) человек    {people:<5}({intersect_people})
+                 команд     {n_teams:<5}({intersect_teams})
+                 emails     {emails:<5}({intersect_emails})
+Доступно(всего)  аудиторий  {n_used_auds:<5}({n_auds})
+                 мест       {seats_available:<5}({seats_total})
+Посажено(пришло) человек    {seated:<5}({arrived})
+                 команд     {seated_teams:<5}({arrived_teams})
+Ключи {{ключ: количество}}
+    {keys}""".format(**self.info)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

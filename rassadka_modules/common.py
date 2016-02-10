@@ -1,4 +1,3 @@
-import datetime
 import unicodedata
 from collections import OrderedDict as oDict
 
@@ -14,7 +13,7 @@ def mutable(method):
     """
     def wrapped(self, *args, **kwargs):
         method(self, *args, **kwargs)
-        self.last_change = datetime.datetime.now().strftime("%A, %d. %B %Y %I:%M%p")
+        self.update()
     return wrapped
 
 
