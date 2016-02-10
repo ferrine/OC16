@@ -12,7 +12,6 @@ from collections import OrderedDict as oDict
 
 class Seat:
     counters = dict([("seated", 0),
-                     ("total", 0),
                      ("arrived", 0)])
 
     def __init__(self, yx, status, data=None, audname=None):
@@ -23,8 +22,6 @@ class Seat:
         self.status = bool(status)
         self.meta_status = status
         self.data = data if data else dict()
-        if self.status:
-            self._plus_total()
 
     def __bool__(self):             # Тут кто-то сидит?
         return bool(self.data)
@@ -37,14 +34,6 @@ class Seat:
         if self.data:
             res = str(self.data["klass"]) + ";"
         return res
-
-    @classmethod
-    def _plus_total(cls):
-        cls.counters["total"] += 1
-
-    @classmethod
-    def _minus_total(cls):
-        cls.counters["total"] -= 1
 
     @classmethod
     def _plus_seated(cls):
@@ -67,24 +56,18 @@ class Seat:
         return cls.counters["seated"]
 
     @classmethod
-    def total_seats(cls) -> int:
-        return cls.counters["total"]
-
-    @classmethod
     def total_arrived(cls) -> int:
         return cls.counters["arrived"]
 
     def switch_on(self):
         if not self.status:
             self.status = True
-            self._plus_total()
         else:
             raise PermissionError
 
     def switch_off(self):
         if self.status and not self.data:
             self.status = False
-            self._minus_total()
         else:
             raise PermissionError
 
@@ -183,8 +166,8 @@ class Mapping:
         self.coords_to_yx = dict()
         res = np.zeros(meta_status_matrix.shape, dtype=object)
         rows = np.apply_along_axis(lambda row: np.any(row), 1, meta_status_matrix).cumsum()
-        seats = np.vectorize(bool)(meta_status_matrix).cumsum(1)     # Получаем места в ряду реальные, накопленные слева направо
-        max_row = 0
+        seats = np.vectorize(bool)(meta_status_matrix).cumsum(1)     # Получаем места в ряду реальные,
+        max_row = 0                                                  # накопленные слева направо
         max_col = 0
         for y in range(meta_status_matrix.shape[0]):
             for x in range(meta_status_matrix.shape[1]):
@@ -639,8 +622,6 @@ class Auditory(SafeClass):
         school_yx = self._read_school(raw_settings["school"])
         self._init_seats(raw_settings["seats"])
         self.klass_school_town_dyx = self._eval_map_conditions(school=school_yx, klass=klass_yx)
-        if not self.settings["available"]:
-            Seat.counters["total"] -= self.map.capacity
 
     def _rand_loop_insert(self, data, available):
         """
@@ -803,24 +784,16 @@ class Auditory(SafeClass):
     def switch_on(self):
         if self.settings["available"] != 1:
             self.settings["available"] = 1
-            Seat.counters["total"] += self.capacity
 
     def switch_off(self):
         if self.settings["available"] != 0:
             self.settings["available"] = 0
-            Seat.counters["total"] -= self.capacity
 
     def __del__(self):
         Seat.counters["seated"] -= self.info["total"]
         Seat.counters["arrived"] -= self.info["arrived"]
-        Seat.counters["total"] -= self.capacity
 
     def refresh(self, new_settings):
-        old_status = self.settings["available"]
-        if not old_status and new_settings["available"]:
-            Seat.counters["total"] += self.capacity
-        if old_status and not new_settings["available"]:
-            Seat.counters["total"] -= self.capacity
         self.settings.update(new_settings)
         self._init_settings_from_dict(self.settings)
 

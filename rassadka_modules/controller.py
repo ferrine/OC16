@@ -577,7 +577,7 @@ class Controller(SafeClass):
         info["seated_teams"] = len(reduce(lambda x, y: x.union(y), [aud.teams_set for aud in self.auds.values()]))
         info["arrived_teams"] = len(reduce(lambda x, y: x.union(y),
                                            [aud.teams_arrived_set for aud in self.auds.values()]))
-        info["seats_available"] = Seat.total_seats()
+        info["seats_available"] = sum([aud.capacity for aud in self.auds.values() if aud.settings["available"]])
         info["seated"] = Seat.total_seated()
         info["seats_total"] = sum([aud.capacity for aud in self.auds.values()])
         info["arrived"] = Seat.total_arrived()
@@ -592,4 +592,3 @@ class Controller(SafeClass):
         key, frequency = np.unique(all_keys, return_counts=True)
         info["keys"] = dict(zip(key, frequency))
         return info
-
