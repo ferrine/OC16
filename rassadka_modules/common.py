@@ -11,7 +11,10 @@ def mutable(method):
     """
     def wrapped(self, *args, **kwargs):
         method(self, *args, **kwargs)
-        self.update()
+        try:
+            self.update()
+        except AttributeError:
+            pass
     return wrapped
 
 

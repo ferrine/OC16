@@ -208,12 +208,10 @@ class Controller(SafeClass):
         self.people = people
         self._split_people()
 
-    @mutable
     def rand_aud_insert_team(self, data):
         not_visited = set(self.auds.values())
         self._rand_loop_team_insert(data=data, available=not_visited)
 
-    @mutable
     def rand_aud_insert(self, data):
         not_visited = set(self.auds.values())
         self._rand_loop_insert(data=data, available=not_visited)
