@@ -135,10 +135,14 @@ class Compare(tk.Toplevel):
                                  command=lambda: save("there"))
         self.d_here = tk.Button(self, text="Выгрузить сидящих\n(несовпадения) [%s]" % len(data["here"]),
                                 command=lambda: save("here"))
-        self.d_nor = tk.Button(self, text="Выгрузить не сидящих [%s]" % len(data["not_seated"]), command=lambda: save("not_seated"))
+        self.d_nor = tk.Button(self, text="Выгрузить не сидящих `people`[%s]" % len(data["not_seated"]),
+                               command=lambda: save("not_seated"))
+        self.e_nor = tk.Button(self, text="Выгрузить не сидящих `emails`[%s]" % len(data["emails_not_seated"]),
+                               command=lambda: save("emails_not_seated"))
         self.d_there.grid(row=1, column=0)
         self.d_here.grid(row=1, column=1)
         self.d_nor.grid(row=2, column=0, columnspan=2, sticky="we")
+        self.e_nor.grid(row=3, column=0, columnspan=2, sticky="we")
 
 
 class RassadkaGUI(tk.Tk, TkTools):

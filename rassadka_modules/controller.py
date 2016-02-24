@@ -398,24 +398,32 @@ class Controller(SafeClass):
         return frame
 
     def comparison(self):
-        if not len(self.people) or not len(self.seated_people):
-            raise ControllerException("Нету людей для сравнения")
-        other = self.people.set_index("email", drop=False)
-        seated = self.seated_people.set_index("email", drop=False)
-        emails = set(seated.index.tolist()) & set(other.index.tolist())
-        not_seated = set(other.index.tolist()) - set(seated.index.tolist())
-        result = {"there": list(), "here": list()}
-        for email in emails:
-            here = seated.loc[email].to_dict()
-            there = other.loc[email].to_dict()
-            for key in self.required_data_cols.keys():
-                if clr(here[key]) != clr(there[key]):
-                    result["there"].append(there)
-                    result["here"].append(here)
-                    break
+        if len(self.people) and len(self.seated_people):
+            other = self.people.set_index("email", drop=False)
+            seated = self.seated_people.set_index("email", drop=False)
+            emails = set(seated.index.tolist()) & set(other.index.tolist())
+            not_seated = set(other.index.tolist()) - set(seated.index.tolist())
+            result = {"there": list(), "here": list()}
+            for email in emails:
+                here = seated.loc[email].to_dict()
+                there = other.loc[email].to_dict()
+                for key in self.required_data_cols.keys():
+                    if clr(here[key]) != clr(there[key]):
+                        result["there"].append(there)
+                        result["here"].append(here)
+                        break
+            result["not_seated"] = other.loc[not_seated].rename(columns=self._default_full_dict)
+        else:
+            result = {"there": list(), "here": list(), "not_seated": pd.DataFrame()}
+        if len(self.email_handle) and len(self.seated_people):
+            seated = self.seated_people.set_index("email", drop=False)
+            result["emails_not_seated"] = pd.DataFrame(set(self.email_handle) - set(seated.index.tolist()))
+        else:
+            result["emails_not_seated"] = pd.DataFrame()
         return {"here": pd.DataFrame.from_records(result["here"]).rename(columns=self._default_full_dict),
                 "there": pd.DataFrame.from_records(result["there"]).rename(columns=self._default_full_dict),
-                "not_seated": other.loc[not_seated].rename(columns=self._default_full_dict)}
+                "not_seated": result["not_seated"],
+                "emails_not_seated": result["emails_not_seated"]}
 
     @property
     def not_seated(self):
