@@ -327,9 +327,12 @@ class RassadkaGUI(tk.Tk, TkTools):
                 continue
             if args:
                 for arg in args.group(1).split(","):
-                    filename = base_filename + "_" + str(arg.strip()) + ext
+                    arg = arg.strip()
+                    filename = base_filename + "_" + str(arg) + ext
+                    if re.match("^[0-9]*$|^True$|^False$", arg):
+                        arg = eval(arg)
                     with open(os.path.join(prefix, filename), mode) as file:
-                        func(file, str(arg.strip()))
+                        func(file, arg)
             else:
                 filename = base_filename + ext
                 with open(os.path.join(prefix, filename), mode) as file:
