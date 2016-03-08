@@ -7,7 +7,7 @@
       <excludeFolder url="file://$MODULE_DIR$/exceltestdata" />
       <excludeFolder url="file://$MODULE_DIR$/test_out" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.5.1 (E:\Programs\Anaconda3\python.exe)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.5.1 (C:\Anaconda3\python.exe)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="TestRunnerService">

@@ -417,7 +417,7 @@ class Controller(SafeClass):
             result = {"there": list(), "here": list(), "not_seated": pd.DataFrame()}
         if len(self.email_handle) and len(self.seated_people):
             seated = self.seated_people.set_index("email", drop=False)
-            result["emails_not_seated"] = pd.DataFrame(set(self.email_handle) - set(seated.index.tolist()))
+            result["emails_not_seated"] = pd.DataFrame(list(set(self.email_handle) - set(seated.index.tolist())))
         else:
             result["emails_not_seated"] = pd.DataFrame()
         return {"here": pd.DataFrame.from_records(result["here"]).rename(columns=self._default_full_dict),
