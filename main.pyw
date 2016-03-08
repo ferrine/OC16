@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 import os
 import tkinter as tk
+import traceback
+import re
 from tkinter import filedialog
 from collections import OrderedDict as oDict
 from rassadka_modules.rassadka_exceptions import ControllerException
@@ -8,7 +10,6 @@ from rassadka_modules.check_system import Checker
 from rassadka_modules.controller import Controller
 from rassadka_modules.tktools import TkTools
 from tkinter.messagebox import showerror
-import traceback
 
 
 class Settings(tk.Toplevel):
@@ -146,8 +147,21 @@ class Compare(tk.Toplevel):
         self.e_nor.grid(row=3, column=0, columnspan=2, sticky="we")
 
 
+class DropdownFunc(tk.Toplevel):
+        def __init__(self, master, from_range, to_func, *args, **kwargs):
+            tk.Toplevel.__init__(self, master,  *args, **kwargs)
+            self.geometry("+500+300")
+
+            def activate(x):
+                to_func(x)
+
+            self.current = tk.StringVar(self, from_range[0])
+            self.select_menu = tk.OptionMenu(self, self.current, *from_range, command=activate)
+            self.select_menu.grid(row=0, column=0)
+
+
 class RassadkaGUI(tk.Tk, TkTools):
-    __SIZE = (500, 250, 500, 250)
+    __SIZE = (700, 400, 500, 250)
     __GUI_GEOM = "%dx%d+%d+%d" % __SIZE
     __POP_POS = "+" + str(int(__SIZE[2] + 0.5 * __SIZE[0])) + "+" + str(int(__SIZE[3] + 0.5 * __SIZE[1]))
     __DEFAULT_APP_PATH = os.path.join(os.path.expanduser("~"), ".rassadka")
@@ -158,7 +172,7 @@ class RassadkaGUI(tk.Tk, TkTools):
 
     def report_callback_exception(self, exc=None, val=None, tb=None):
         if Checker.settings.get("debug_mode", False):
-            traceback.print_exception(exc, val, tb, file=open(self.__DEBUG_FILE, "w"))
+            traceback.print_exception(exc, val, tb, file=open(self.__DEBUG_FILE, "a"))
             showerror("Ошибка", message="См ошибку в файле {}".format(self.__DEBUG_FILE))
         else:
             showerror("Ошибка", message=str(exc) + "\n" + str(val))
@@ -216,27 +230,42 @@ class RassadkaGUI(tk.Tk, TkTools):
         commands["Загрузки"]["Добавить аудиторию"] = {"command": self.load(self, self.controller.load_auditory)}
         commands["Загрузки"]["Очистить загруженных"] = {"command": self.controller.clear_buffer}
         commands["Выгрузки"]["Сравнение"] = {"command": lambda: Compare(self, self.controller.comparison())}
-        commands["Выгрузки"]["На стенд"] = {"command": self.save(parent=self, item=self.controller.seated_to_excel,
-                                            for_item=dict(full=False))}
+        commands["Выгрузки"]["На стенд"] = {"command": self.save(parent=self, item=self.controller.save_seated_to_excel,
+                                                                 for_item=dict(full=False),
+                                                                 initialfile="Список на стенд")}
         commands["Выгрузки"]["Полная выгрузка"] = {"command":
-                                                   self.save(parent=self, item=self.controller.seated_to_excel,
-                                                             for_item=dict(full=True))}
-        commands["Выгрузки"]["Раздатка"] = {"command": self.save(parent=self, item=self.controller.razdatka_to_excel)}
+                                                   self.save(parent=self, item=self.controller.save_seated_to_excel,
+                                                             for_item=dict(full=True),
+                                                             initialfile="Полная выгрузка")}
+        commands["Выгрузки"]["Раздатка"] = {"command": self.save(parent=self, item=self.controller.save_razdatka_to_excel,
+                                                                 initialfile="Раздатка")}
         commands["Выгрузки"]["Карты..."] = oDict()
         commands["Выгрузки"]["Карты..."]["Карта с классами"] = {"command": self.save(self,
-                                                                item=self.controller.maps_with_data_to_excel,
-                                                                for_item=dict(data="klass"),
-                                                                filetypes=(('Excel files', '.xlsx'), ))}
+                                                                                     item=self.controller.save_maps_with_data_to_excel,
+                                                                                     for_item=dict(data="klass"),
+                                                                                     filetypes=(('Excel files', '.xlsx'), ),
+                                                                                     initialfile="Карты мест с klass")}
         commands["Выгрузки"]["Карты..."]["Карта с местами"] = {"command": self.save(self,
-                                                               item=self.controller.maps_with_status_to_excel,
-                                                               filetypes=(('Excel files', '.xlsx'), ))}
+                                                                                    item=self.controller.save_maps_with_status_to_excel,
+                                                                                    filetypes=(('Excel files', '.xlsx'), ),
+                                                                                    initialfile="Карты мест с seat")}
+        commands["Выгрузки"]["Карты..."]["Карта с произвольной информацией"] = {
+            "command": lambda: DropdownFunc(self, list(self.controller._default_full_dict.keys()),
+                                            lambda item: self.save(None,
+                                                                   item=self.controller.save_maps_with_data_to_excel,
+                                                                   for_item=dict(data=item),
+                                                                   filetypes=(('Excel files', '.xlsx'), ),
+                                                                   initialfile="Карты мест с %s" % item)())}
         commands["Выгрузки"]["Аудитории..."] = oDict()
         commands["Выгрузки"]["Аудитории..."]["в txt"] = {"command": self.save(parent=self,
-                                                         item=self.controller.summary_to_txt,
-                                                         filetypes=(("txt files", ".txt"), ))}
+                                                                              item=self.controller.save_summary_to_txt,
+                                                                              filetypes=(("txt files", ".txt"), ),
+                                                                              initialfile="Статистика по аудиториям")}
         commands["Выгрузки"]["Аудитории..."]["в Excel"] = {"command": self.save(parent=self,
-                                                           item=self.controller.summary_to_excel,
-                                                           filetypes=(("Excel files", ".xlsx"), ))}
+                                                                                item=self.controller.save_summary_to_excel,
+                                                                                filetypes=(("Excel files", ".xlsx"), ),
+                                                                                initialfile="Статистика по аудиториям")}
+        commands["Выгрузки"]["Выгрузить все в..."] = {"command": self.save_all_to_directory}
         commands["Волшебство"]["Рассадить"] = {"command": self.controller.place_loaded_people}
         commands["Волшебство"]["Закрепить на ключ"] = oDict()
         commands["Волшебство"]["Закрепить на ключ"]["всех"] = {"command": self.key_usage(func=
@@ -281,6 +310,31 @@ class RassadkaGUI(tk.Tk, TkTools):
         self.bind_all("<Button-1>", self.upd, add="+")
         self.config(menu=menu)
 
+    def save_all_to_directory(self):
+        prefix = filedialog.askdirectory(parent=self, mustexist=False)
+        if not os.path.exists(prefix):
+            os.mkdir(prefix)
+        savers = [name for name in dir(self.controller) if name.startswith("save_")]
+        re_filename = re.compile("<(.*)>")  # Имя файла без расширения будет в docstring
+        re_args = re.compile("\[(.*)\]")    # Для доп аргументов, если они будут
+        for save_func in savers:
+            ext = ".xlsx" if save_func.endswith("excel") else ".txt"
+            mode = "wb" if save_func.endswith("excel") else "w"
+            func = getattr(self.controller, save_func)
+            base_filename = re_filename.search(func.__doc__).group(1)
+            args = re_args.search(func.__doc__)
+            if not base_filename:
+                continue
+            if args:
+                for arg in args.group(1).split(","):
+                    filename = base_filename + "_" + str(arg.strip()) + ext
+                    with open(os.path.join(prefix, filename), mode) as file:
+                        func(file, str(arg.strip()))
+            else:
+                filename = base_filename + ext
+                with open(os.path.join(prefix, filename), mode) as file:
+                        func(file)
+
     def load(self, parent, item, for_item=None, **kwargs):
         if not for_item:
             for_item = dict()
@@ -295,13 +349,13 @@ class RassadkaGUI(tk.Tk, TkTools):
             self.upd()
         return wrapper
 
-    def save(self, parent, item, filetypes=(('Excel files', '.xlsx'),), for_item=None, **kwargs):
+    def save(self, parent, item, filetypes=(('Excel files', '.xlsx'),), for_item=None, initialfile="output", **kwargs):
         if not for_item:
             for_item = dict()
 
         def wrapper():
             path = tk.filedialog.SaveAs(parent, filetypes=filetypes,
-                                        initialfile="output", **kwargs).show()
+                                        initialfile=initialfile, **kwargs).show()
             if not path:
                 return
             if not path.endswith(filetypes[0][-1]):

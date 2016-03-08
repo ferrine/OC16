@@ -762,7 +762,7 @@ class Auditory(SafeClass):
         for y, x in product(range(self.map.shape[0]), range(self.map.shape[1])):
             person = self.map.get_data((y, x))
             if self.map.m[(y, x)]:
-                task = person[data]
+                task = str(person[data])
             elif self.map.m[(y, x)].status:
                 task = "..."
             else:

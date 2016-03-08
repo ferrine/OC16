@@ -23,25 +23,25 @@ def con_test():
         print("...bad end")
     print("making xlsx file...")
     print("\tРассаженные участники.xlsx")
-    con.seated_to_excel(open(prefix + "Рассаженные участники.xlsx", "wb"))
+    con.save_seated_to_excel(open(prefix + "Рассаженные участники.xlsx", "wb"))
 
     print("\tРассаженные участники full.xlsx")
-    con.seated_to_excel(open(prefix + "Рассаженные участники full.xlsx", "wb"), full=True)
+    con.save_seated_to_excel(open(prefix + "Рассаженные участники full.xlsx", "wb"), full=True)
 
     print("\twhole_sum.txt")
-    con.summary_to_txt(file=open(prefix + "whole_sum.txt", "w"))
+    con.save_summary_to_txt(file=open(prefix + "whole_sum.txt", "w"))
 
     print("\twith_klass.xlsx")
-    con.maps_with_data_to_excel("klass", open(prefix + "with_klass.xlsx", "wb"))
+    con.save_maps_with_data_to_excel(open(prefix + "with_klass.xlsx", "wb"), "klass")
 
     print("\twith_status.xlsx")
-    con.maps_with_status_to_excel(open(prefix + "with_status.xlsx", "wb"))
+    con.save_maps_with_status_to_excel(open(prefix + "with_status.xlsx", "wb"))
 
     print("\tСтатистика по аудиториям.xlsx")
-    con.summary_to_excel(open(prefix + "Статистика по аудиториям.xlsx", "wb"))
+    con.save_summary_to_excel(open(prefix + "Статистика по аудиториям.xlsx", "wb"))
 
     print("\tРаздатка.xlsx")
-    con.razdatka_to_excel(open(prefix + "Раздатка.xlsx", "wb"))
+    con.save_razdatka_to_excel(open(prefix + "Раздатка.xlsx", "wb"))
     print(con)
     print("add П2")
     con.switch_on_aud("П2")
@@ -58,9 +58,9 @@ def update_test():
     con.load_people(open(for_update, "rb"))
     s1 = open(prefix + "update_test_out_1.xlsx", "wb")
     s2 = open(prefix + "update_test_out_2.xlsx", "wb")
-    con.seated_to_excel(s1)
+    con.save_seated_to_excel(s1)
     con.update_seated_by_coords(forced=True)
-    con.seated_to_excel(s2)
+    con.save_seated_to_excel(s2)
     s1.close()
     s2.close()
 

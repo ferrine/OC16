@@ -434,13 +434,23 @@ class Controller(SafeClass):
         emails = set(other.index.tolist()) - set(seated.index.tolist())
         return other.loc[emails]
 
-    def summary_to_txt(self, file):
+    def save_summary_to_txt(self, file):
+        """
+        <Статистика по аудиториям>
+        :param file:
+        :return:
+        """
         message = ""
         for aud in sorted(self.auds.values()):
             message += aud.summary + "\n"
         file.write(message)
 
-    def summary_to_excel(self, file):
+    def save_summary_to_excel(self, file):
+        """
+        <Статистика по аудиториям>
+        :param file:
+        :return:
+        """
         with pd.ExcelWriter(file) as writer:
             summary = list()
             for aud in sorted(self.auds.values()):
@@ -448,8 +458,10 @@ class Controller(SafeClass):
             table = pd.DataFrame.from_records(summary, index="name")
             table.ix[:, Auditory.export_names.keys()].rename(columns=Auditory.export_names).to_excel(writer)
 
-    def seated_to_excel(self, file, full=False):
+    def save_seated_to_excel(self, file, full=False):
         """
+        <Участники>
+        [True, False]
         Выводит в эксель инфу по участникам, с их местами и тд
         :param file: куда выводить
         :param bool full: всю ли инфу выводить или только на стенд?
@@ -469,8 +481,10 @@ class Controller(SafeClass):
             sheet.hide_gridlines(0)
             sheet.set_paper(9)
 
-    def maps_with_data_to_excel(self, data, file):
+    def save_maps_with_data_to_excel(self, file, data):
         """
+        <Карта мест с>
+        [email, fam, name, otch, town, school, team, klass, arrived, key]
         Выводит карту рассадки в эксель с необходимой информацией
         :param file: куда выводим
         :param data: какая информация нужна
@@ -494,8 +508,9 @@ class Controller(SafeClass):
                 sheet.fit_to_pages(1, 1)
                 sheet.set_page_view()
 
-    def maps_with_status_to_excel(self, file):
+    def save_maps_with_status_to_excel(self, file):
         """
+        <Карта с местами>
         Выводит карту рассадка с пропечатанными местами в эксель
         :param file: куда выводим
         """
@@ -518,8 +533,9 @@ class Controller(SafeClass):
                 sheet.fit_to_pages(1, 1)
                 sheet.set_page_view()
 
-    def razdatka_to_excel(self, file):
+    def save_razdatka_to_excel(self, file):
         """
+        <Раздатка>
         Выводит списки с участниками в каждой аудитории в ексель
         :param file: куда выводим
         :return:
@@ -596,40 +612,16 @@ class Controller(SafeClass):
         self._message = """
 Последнее изменение {last_change}
 Режим -{mode}-
-Загружено(сидит) человек    {people:<5}({intersect_people})
-                 команд     {n_teams:<5}({intersect_teams})
-                 emails     {emails:<5}({intersect_emails})
+
+Временные списки для взаимодействия с рассаженными
+    Загружено(сидит) человек    {people:<5}({intersect_people})
+                     команд     {n_teams:<5}({intersect_teams})
+                     emails     {emails:<5}({intersect_emails})
+
+--------------------------
 Доступно(всего)  аудиторий  {n_used_auds:<5}({n_auds})
                  мест       {seats_available:<5}({seats_total})
 Посажено(пришло) человек    {seated:<5}({arrived})
                  команд     {seated_teams:<5}({arrived_teams})
-Ключи {{ключ: количество}}
+Ключи блокировки мест {{ключ: количество}}
     {keys}""".format(**self.info)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
