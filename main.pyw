@@ -303,7 +303,7 @@ class RassadkaGUI(tk.Tk, TkTools):
             "background": "red"
         }
         self.test_button = tk.Button(text="Настройки",
-                                     command=lambda: Settings(self, [Checker] +
+                                     command=lambda: Settings(self, [self.controller] +
                                                               sorted(list(self.controller.auds.values()))))
         self.test_button.grid(column=0, columnspan=2, sticky="we")
         self._create_menu(menu, commands, menuopts=dict(tearoff=0))

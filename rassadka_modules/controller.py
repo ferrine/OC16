@@ -17,6 +17,7 @@ from rassadka_modules.safe_class import SafeClass
 
 
 class Controller(SafeClass):
+    inner_name = Checker.inner_name
     required_data_cols = oDict([("email", "email"), ("fam", "Фамилия"), ("name", "Имя"), ("otch", "Отчество"),
                                 ("town", "Город"), ("school", "Школа"), ("team", "Команда"),
                                 ("klass", "Класс")])
@@ -26,6 +27,17 @@ class Controller(SafeClass):
     _mini_out = ["fam", "name", "otch", "aud", "row", "col"]
     _razdatka_cols = ["fam", "name", "otch", "row", "col", "Пришел?"]
     max_iter = 20
+
+    CHECK = ["cl8_9", "cl8_10", "cl8_11", "cl9_10",  # Для виджета
+             "cl9_11", "cl10_11", "one_school",
+             "one_town", "com_in_one",
+             "debug_mode"]
+
+    SCALE = [{"name": "max_compart", "var": (0, 1)}]
+
+    @property
+    def settings(self):
+        return self.checker.settings
 
     def __getitem__(self, item):
         return self.auds[item]
@@ -122,8 +134,11 @@ class Controller(SafeClass):
         в пачки команд и индивидуалов в
         соответствии с настройками
         """
+        self.inds = list()
+        self.teams = list()
         tmp = pd.DataFrame(self.people.drop(["aud", "row", "col"], errors="ignore", axis=1))
         self.inds = tmp.query("team == 'и'").to_dict(orient="records")
+        print(self.checker.settings["com_in_one"])
         if not self.checker.settings["com_in_one"]:
             self.inds.extend(tmp.query("team != 'и'").to_dict(orient="records"))
         else:
@@ -184,8 +199,6 @@ class Controller(SafeClass):
            надо дополнительно указать все места
            Аудитория, Ряд, Место
         """
-        self.inds = list()
-        self.teams = list()
         people = pd.read_excel(file, sheetname=0).applymap(clr)
         if not self._check_settings(fact=set(people.columns),
                                     req=set(self.required_data_cols.values()),
@@ -385,6 +398,11 @@ class Controller(SafeClass):
             self.rand_aud_insert_team(team)
         for individual in self.inds:
             self.rand_aud_insert(individual)
+
+    @mutable
+    def refresh(self, new_settings):
+        self.checker.refresh(new_settings)
+        self._split_people()
 
     @property
     def seated_people(self) -> pd.DataFrame:
@@ -625,3 +643,5 @@ class Controller(SafeClass):
                  команд     {seated_teams:<5}({arrived_teams})
 Ключи блокировки мест {{ключ: количество}}
     {keys}""".format(**self.info)
+
+

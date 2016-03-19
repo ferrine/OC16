@@ -6,6 +6,7 @@
       <sourceFolder url="file://$MODULE_DIR$" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/exceltestdata" />
       <excludeFolder url="file://$MODULE_DIR$/test_out" />
+      <excludeFolder url="file://$MODULE_DIR$/~export" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.5.1 (C:\Anaconda3\python.exe)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
