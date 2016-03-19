@@ -753,13 +753,22 @@ class Auditory(SafeClass):
             # Для конроллера необходимо словить исключение в этом случае
             raise EndLoopException
 
-    def map_with_data_to_writer(self, writer, seats_format, data):
+    def map_with_data_to_writer(self, writer, seats_format, data, reverse=False):
         writer.write(0, 0, "Абс.")
-        for y in range(self.map.shape[0]):
-            writer.write(y + 1, 0, "ряд " + str(y + 1))
-        for x in range(self.map.shape[1]):
-            writer.write(0, x + 1, "мст " + str(x + 1))
-        for y, x in product(range(self.map.shape[0]), range(self.map.shape[1])):
+        y_range = range(self.map.shape[0])
+        x_range = range(self.map.shape[1])
+        if reverse:
+            y_zip = list(zip(y_range, reversed(y_range)))
+            x_zip = list(zip(x_range, reversed(x_range)))
+        else:
+            y_zip = list(zip(y_range, y_range))
+            x_zip = list(zip(x_range, x_range))
+        yx_zip = product(y_zip, x_zip)
+        for y, wy in y_zip:
+            writer.write(wy + 1, 0, "ряд " + str(y + 1))
+        for x, wx in x_zip:
+            writer.write(0, wx + 1, "мст " + str(x + 1))
+        for (y, wy), (x, wx) in yx_zip:
             person = self.map.get_data((y, x))
             if self.map.m[(y, x)]:
                 task = str(person[data])
@@ -767,19 +776,30 @@ class Auditory(SafeClass):
                 task = "..."
             else:
                 task = "______"
-            writer.write(y + 1, x + 1, task, seats_format)
+            writer.write(wy + 1, wx + 1, task, seats_format)
+        writer.write(self.map.shape[0] + 2, 0, "ДОСКА ВНИЗУ" if reverse else "ДОСКА ВВЕРХУ")
 
-    def map_with_status_to_writer(self, writer, seats_format):
+    def map_with_status_to_writer(self, writer, seats_format, reverse=True):
         writer.write(0, 0, "Абс.")
-        for y in range(self.map.shape[0]):
-            writer.write(y + 1, 0, "ряд " + str(y + 1))
-        for x in range(self.map.shape[1]):
-            writer.write(0, x + 1, "мст " + str(x + 1))
-        for y, x in product(range(self.map.shape[0]), range(self.map.shape[1])):
+        y_range = range(self.map.shape[0])
+        x_range = range(self.map.shape[1])
+        if reverse:
+            y_zip = list(zip(y_range, reversed(y_range)))
+            x_zip = list(zip(x_range, reversed(x_range)))
+        else:
+            y_zip = list(zip(y_range, y_range))
+            x_zip = list(zip(x_range, x_range))
+        yx_zip = product(y_zip, x_zip)
+        for y, wy in y_zip:
+            writer.write(wy + 1, 0, "ряд " + str(y + 1))
+        for x, wx in x_zip:
+            writer.write(0, wx + 1, "мст " + str(x + 1))
+        for (y, wy), (x, wx) in yx_zip:
             task = "______"
             if self.map[y, x].status:
                 task = str(self.map[y, x].yx)
-            writer.write(y + 1, x + 1, task, seats_format)
+            writer.write(wy + 1, wx + 1, task, seats_format)
+        writer.write(self.map.shape[0] + 2, 0, "ДОСКА ВНИЗУ" if reverse else "ДОСКА ВВЕРХУ")
 
     def switch_on(self):
         if self.settings["available"] != 1:

@@ -250,7 +250,7 @@ class RassadkaGUI(tk.Tk, TkTools):
                                                                                     filetypes=(('Excel files', '.xlsx'), ),
                                                                                     initialfile="Карты мест с seat")}
         commands["Выгрузки"]["Карты..."]["Карта с произвольной информацией"] = {
-            "command": lambda: DropdownFunc(self, list(self.controller._default_full_dict.keys()),
+            "command": lambda: DropdownFunc(self, list(self.controller.required_data_cols.keys()),
                                             lambda item: self.save(None,
                                                                    item=self.controller.save_maps_with_data_to_excel,
                                                                    for_item=dict(data=item),
