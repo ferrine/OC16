@@ -10,11 +10,13 @@ def mutable(method):
     :return:
     """
     def wrapped(self, *args, **kwargs):
-        method(self, *args, **kwargs)
         try:
-            self.update()
-        except AttributeError:
-            pass
+            method(self, *args, **kwargs)
+        finally:
+            try:
+                self.update()
+            except AttributeError:
+                pass
     return wrapped
 
 
