@@ -753,7 +753,7 @@ class Auditory(SafeClass):
             # Для конроллера необходимо словить исключение в этом случае
             raise EndLoopException
 
-    def map_with_data_to_writer(self, writer, seats_format, data, reverse=False):
+    def map_with_data_to_writer(self, writer, seats_format, data, reverse=True):
         writer.write(0, 0, "Абс.")
         y_range = range(self.map.shape[0])
         x_range = range(self.map.shape[1])
