@@ -3,7 +3,7 @@ from collections import OrderedDict as oDict
 
 
 class TkTools:
-    # Mixin class
+    # MixIn class
 
     @staticmethod
     def _create_menu(parent, dictionary, cascadeopts=None,
@@ -11,9 +11,9 @@ class TkTools:
         """
         loop initial
         This method helps to create a tree menu easily
-        the only thing you shulg prepare is a structure 
+        the only thing you should prepare is a structure 
         with commands. The structure is dictionary-like.
-        OrderedDict is menu list, dict is command description
+        OrderedDict is menu list, dict is command description.
         ##########
         Usage Example:
         ##########
