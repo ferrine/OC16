@@ -165,7 +165,7 @@ class Mapping:
         self.capacity = 0
         self.coords_to_yx = dict()
         res = np.zeros(meta_status_matrix.shape, dtype=object)
-        rows = np.apply_along_axis(lambda row: np.any(row), 1, meta_status_matrix).cumsum()
+        rows = np.apply_along_axis(np.any, 1, meta_status_matrix).cumsum()
         seats = np.vectorize(bool)(meta_status_matrix).cumsum(1)     # Получаем места в ряду реальные,
         max_row = 0                                                  # накопленные слева направо
         max_col = 0
@@ -576,6 +576,7 @@ class Auditory(SafeClass):
         seats_map[seats_map == self._required_seats_values["seat"]] = 1
         seats_map[seats_map == self._required_seats_values["fake_seat"]] = 2
         seats_map[seats_map == self._required_seats_values["not_allowed"]] = 0
+        seats_map = seats_map.astype(np.int32, copy=False)
         self.map = Mapping(seats_map, str(self.settings["name"]))
         self._create_paths()
 
