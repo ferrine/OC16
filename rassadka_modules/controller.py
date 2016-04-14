@@ -412,7 +412,7 @@ class Controller(SafeClass):
         seated = list()
         for aud in sorted(self.auds.values()):
             seated.extend(aud.get_all_seated())
-        frame = pd.DataFrame.from_dict(seated)
+        frame = pd.DataFrame.from_records(seated)
         return frame
 
     def comparison(self):
