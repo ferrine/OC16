@@ -15,7 +15,7 @@ from tkinter.messagebox import showerror
 class Settings(tk.Toplevel):
 
     def __init__(self, master, items, *args, **kwargs):
-        tk.Toplevel.__init__(self, master=master, *args, **kwargs)
+        super(Settings, self).__init__(master=master, *args, **kwargs)
         self.wm_title("Настройки")
         self.geometry("+500+300")
         self.items = oDict([(item.inner_name, item) for item in items])
@@ -117,7 +117,7 @@ class Settings(tk.Toplevel):
 
 class Compare(tk.Toplevel):
     def __init__(self, master, data, *args, **kwargs):
-        tk.Toplevel.__init__(self, master=master, *args, **kwargs)
+        super(Compare, self).__init__(master=master, *args, **kwargs)
         self.wm_title("Сравнение")
         self.geometry("+500+300")
         self.info = tk.Label(self, text="Найдено несовпадений {}".format(len(data["here"])),
@@ -149,7 +149,7 @@ class Compare(tk.Toplevel):
 
 class DropdownFunc(tk.Toplevel):
         def __init__(self, master, from_range, to_func, *args, **kwargs):
-            tk.Toplevel.__init__(self, master,  *args, **kwargs)
+            super(DropdownFunc, self).__init__(master,  *args, **kwargs)
             self.geometry("+500+300")
 
             def activate(x):
@@ -198,7 +198,7 @@ class RassadkaGUI(tk.Tk, TkTools):
         self.after(200, self.task, event)
 
     def __init__(self):
-        tk.Tk.__init__(self)
+        super(RassadkaGUI, self).__init__()
         self.wm_title("Рассадка v1.0")
         self.__SAVE_ON_EXIT = tk.BooleanVar(self, value=True)
         self.geometry(self.__GUI_GEOM)
