@@ -215,9 +215,11 @@ class Controller(SafeClass):
             self.mode["people"] = "None"            # Нельзя ничего делать с рассаженными участниками
             return
         elif "aud" in people.columns:
+            people['aud'] = np.vectorize(str)(people['aud'])
             self.mode["people"] = "input/edit"      # Можно менять информацию, изымать и добавлять
         else:
             self.mode["people"] = "input"           # Можно только добавлять
+
         self.people = people
         self._split_people()
 
