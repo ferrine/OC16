@@ -375,7 +375,7 @@ class Controller(SafeClass):
         Очистить подгруженных людей и emails.
         Обнуляет уровень доступа.
         """
-        self.people = pd.DataFrame()
+        self.people = pd.DataFrame(columns=self.required_data_cols.keys())
         self.inds = list()
         self.teams = list()
         self.email_handle = list()
