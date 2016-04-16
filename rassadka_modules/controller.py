@@ -25,7 +25,7 @@ class Controller(SafeClass):
     _default_full_dict.update([("aud", "Ауд."), ("row", "Ряд"),
                                ("col", "Место"), ("arrived", "Отметка о прибытии"), ("key", "Ключ")])
     _mini_out = ["fam", "name", "otch", "aud", "row", "col"]
-    _razdatka_cols = ["fam", "name", "otch", "row", "col", "Пришел?"]
+    _razdatka_cols = ["fam", "name", "otch", "klass", "row", "col", "Пришел?", "Справка?"]
     max_iter = 20
 
     CHECK = ["cl8_9", "cl8_10", "cl8_11", "cl9_10",  # Для виджета
@@ -567,6 +567,8 @@ class Controller(SafeClass):
                     writer, aud.inner_name, index=False)
                 sheet = writer.sheets[aud.inner_name]
                 sheet.set_column("A:C", 15)
+                sheet.set_column("D:H", 9)
+                sheet.set_margins(left=0.2, right=0.2)
                 sheet.repeat_rows(0)
                 sheet.hide_gridlines(0)
                 sheet.set_paper(9)
