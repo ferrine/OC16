@@ -772,7 +772,7 @@ class Auditory(SafeClass):
         for (y, wy), (x, wx) in yx_zip:
             person = self.map.get_data((y, x))
             if self.map.m[(y, x)]:
-                task = str(person[data])
+                task = str(person.get(data, 'None'))
             elif self.map.m[(y, x)].status:
                 task = "..."
             else:
