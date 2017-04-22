@@ -3,7 +3,6 @@ import random
 import numpy as np
 import pandas as pd
 import xlsxwriter
-import warnings
 
 from functools import reduce
 from pandas import ExcelFile
@@ -25,7 +24,7 @@ class Controller(SafeClass):
     _default_full_dict.update([("aud", "Ауд."), ("row", "Ряд"),
                                ("col", "Место"), ("arrived", "Отметка о прибытии"), ("key", "Ключ")])
     _mini_out = ["fam", "name", "otch", "aud", "row", "col"]
-    _razdatka_cols = ["fam", "name", "otch", "klass", "row", "col", "Пришел?", "Справка?"]
+    _razdatka_cols = ["fam", "name", "otch", "school", "klass", "row", "col", "Пришел?", "Справка?", "key"]
     max_iter = 20
 
     CHECK = ["cl8_9", "cl8_10", "cl8_11", "cl9_10",  # Для виджета
@@ -525,8 +524,8 @@ class Controller(SafeClass):
                 else:
                     sheet.set_paper(9)
                 sheet.set_landscape()
-                sheet.fit_to_pages(1, 1)
                 sheet.set_page_view()
+                sheet.fit_to_pages(1, 1)
 
     def save_maps_with_status_to_excel(self, file):
         """
@@ -550,8 +549,8 @@ class Controller(SafeClass):
                 else:
                     sheet.set_paper(9)
                 sheet.set_landscape()
-                sheet.fit_to_pages(1, 1)
                 sheet.set_page_view()
+                sheet.fit_to_pages(1, 1)
 
     def save_razdatka_to_excel(self, file):
         """
@@ -567,13 +566,14 @@ class Controller(SafeClass):
                     writer, aud.inner_name, index=False)
                 sheet = writer.sheets[aud.inner_name]
                 sheet.set_column("A:C", 15)
-                sheet.set_column("D:H", 9)
+                sheet.set_column("D:J", 9)
                 sheet.set_margins(left=0.2, right=0.2)
                 sheet.repeat_rows(0)
                 sheet.hide_gridlines(0)
                 sheet.set_paper(9)
                 sheet.set_header("&L&30 " + aud.inner_name)
                 sheet.set_page_view()
+                sheet.fit_to_pages(1, 0)
 
     def to_pickle(self, file):
         """
